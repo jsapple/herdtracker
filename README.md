@@ -13,13 +13,13 @@ Site settings → Environment variables (or "Project configuration" on newer UIs
 This whole folder is the site:
 ```
 netlify.toml
+package.json              ← installs @supabase/supabase-js for the functions
 netlify/functions/        ← the backend
 public/                   ← the website (index.html, app.js, stats.js, manifest, icons, admin.html)
 ```
-Deploy it as a Git repo connected to Netlify, or drag-and-drop this folder
-into Netlify's "Deploys" tab for a first manual deploy. Git is strongly
-preferred — the drag-and-drop method won't pick up netlify/functions/package.json
-correctly in all cases.
+Deploy it as a Git repo connected to Netlify. The Supabase library has to
+live in the root package.json. Netlify does not install a package.json that
+sits inside netlify/functions.
 
 ## 4. First producer
 Visit yoursite.netlify.app/admin.html, enter your ADMIN_SECRET, and create
