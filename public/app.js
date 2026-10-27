@@ -141,7 +141,7 @@ ${pageTools('producer')}`;
 function finishBlock(s) {
   if (s.wt == null) return '';
   if (s.atTarget) return '<div class="fin ok">At target</div>';
-  if (s.finish) return `<div class=fin>${fmt(s.finish)}<small>${s.days} days · ${s.toGo} lb to go</small></div>`;
+  if (s.finish) return `<div class=fin>${fmt(s.finish, false)}<small>${s.days} days · ${s.toGo} lb to go</small></div>`;
   if (s.estimateNote === 'low') return `<p class=mu>Gain is too low to estimate a date.</p><p class=mu>${s.toGo} lb to go</p>`;
   return `<p class=mu>Weigh again to estimate a date.</p><p class=mu>${s.toGo} lb to go</p>`;
 }
@@ -155,7 +155,7 @@ function animalV(a, g, selecting) {
   const slow = g.slower.includes(a.id);
   return `<div class=an data-tag="${attr(a.tag)}" data-id="${a.id}"${selecting ? ` onclick="toggleSel('${a.id}')"` : ''}>
 <div class=l1><b>${selecting ? `<span class="ck${on ? ' on' : ''}"></span>` : ''}${esc(a.tag)}</b><b>${s.wt == null ? '—' : s.wt + ' lb'}</b></div>
-${s.date ? `<p class=mu style="margin:4px 0">Last weigh on ${fmt(s.date)} · ${ago(s.since)}</p>` : '<p class=mu style="margin:4px 0">No weight yet</p>'}
+${s.date ? `<p class=mu style="margin:4px 0">weight on ${fmt(s.date)} · ${ago(s.since)}</p>` : '<p class=mu style="margin:4px 0">No weight yet</p>'}
 <div class="pb${s.atTarget ? ' ok' : ''}"><i style="width:${pct.toFixed(0)}%"></i></div>
 ${selecting ? '' : targetControls(a)}
 ${finishBlock(s)}
@@ -879,24 +879,33 @@ function fileName(name) {
   const clean = String(name || 'weights').replace(/[^\w\-]+/g, '-').replace(/^-|-$/g, '') || 'weights';
   return clean + '-weights.csv';
 }
-function rowsFor(clientName, list) {
+function rowsFor(list) {
   const rows = [];
   list.slice().sort(tagSort).forEach((a) => {
     const w = (a.weighins || []).slice().sort((x, y) => String(x[0]).localeCompare(String(y[0])));
     if (!w.length) {
-      rows.push([clientName, a.tag, a.status, '', '', a.targetLb, a.shipDate || '', a.shipLb == null ? '' : a.shipLb]);
+      rows.push([a.tag, a.status, '', '', a.targetLb, a.shipDate || '', a.shipLb == null ? '' : a.shipLb]);
       return;
     }
     w.forEach(([d, lb]) => {
-      rows.push([clientName, a.tag, a.status, d, lb, a.targetLb, a.shipDate || '', a.shipLb == null ? '' : a.shipLb]);
+      rows.push([a.tag, a.status, d, lb, a.targetLb, a.shipDate || '', a.shipLb == null ? '' : a.shipLb]);
     });
   });
   return rows;
 }
-function saveCsv(name, rows) {
-  const header = ['Client', 'Tag', 'Status', 'Weigh date', 'Weight lb', 'Target lb', 'Ship date', 'Ship weight lb'];
-  const body = [header].concat(rows).map((r) => r.map(csvCell).join(',')).join('\r\n');
-  const blob = new Blob(['\uFEFF' + body], { type: 'text/csv;charset=utf-8' });
+function csvText(sections) {
+  const header = ['Tag', 'Status', 'Weigh date', 'Weight lb', 'Target lb', 'Ship date', 'Ship weight lb'];
+  const lines = [];
+  sections.forEach((section, i) => {
+    if (i) lines.push('');
+    lines.push(csvCell(section.title));
+    lines.push(header.map(csvCell).join(','));
+    section.rows.forEach((r) => lines.push(r.map(csvCell).join(',')));
+  });
+  return lines.join('\r\n');
+}
+function saveCsv(name, sections) {
+  const blob = new Blob(['\uFEFF' + csvText(sections)], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
@@ -909,14 +918,14 @@ function downloadClient(id) {
   const c = clientOf(id);
   if (!c) return;
   const list = S.data.animals.filter((a) => a.clientId === id);
-  saveCsv(fileName(c.name), rowsFor(c.name, list));
+  saveCsv(fileName(c.name), [{ title: c.name, rows: rowsFor(list) }]);
 }
 function downloadAll() {
-  const rows = [];
-  clientsSorted().forEach((c) => {
-    rows.push.apply(rows, rowsFor(c.name, S.data.animals.filter((a) => a.clientId === c.id)));
-  });
-  saveCsv('all-clients-weights.csv', rows);
+  const sections = clientsSorted().map((c) => ({
+    title: c.name,
+    rows: rowsFor(S.data.animals.filter((a) => a.clientId === c.id))
+  }));
+  saveCsv('all-clients-weights.csv', sections);
 }
 
 function paperDate(iso) {
