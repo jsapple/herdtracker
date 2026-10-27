@@ -24,12 +24,12 @@ async function api(path, body) {
   }
 }
 
-function fmt(iso) {
+function fmt(iso, year) {
   if (!iso) return '';
   const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
   const dt = new Date(y, m - 1, d);
   const opts = { month: 'short', day: 'numeric' };
-  if (y !== new Date().getFullYear()) opts.year = 'numeric';
+  if (year !== false && y !== new Date().getFullYear()) opts.year = 'numeric';
   return dt.toLocaleDateString(undefined, opts);
 }
 function fmtStamp(s) {
@@ -78,7 +78,7 @@ function chart(animals) {
 function band(h, a, g) {
   const avg = a == null ? '—' : Math.round(a);
   const gain = g == null ? '—' : Number(g).toFixed(2);
-  return `<div class=band><div><b>${h}</b>head</div><div><b>${avg}</b>avg lb</div><div><b>${gain}</b>lb per day</div></div>`;
+  return `<div class=band><div><b>${h}</b>head</div><div><b>${gain}</b>lb per day</div><div><b>${avg}</b>avg lb</div></div>`;
 }
 
 function activeOf(clientId) { return S.data.animals.filter((a) => a.clientId === clientId && a.status === 'active'); }
@@ -155,7 +155,7 @@ function animalV(a, g, selecting) {
   const slow = g.slower.includes(a.id);
   return `<div class=an data-tag="${attr(a.tag)}" data-id="${a.id}"${selecting ? ` onclick="toggleSel('${a.id}')"` : ''}>
 <div class=l1><b>${selecting ? `<span class="ck${on ? ' on' : ''}"></span>` : ''}${esc(a.tag)}</b><b>${s.wt == null ? '—' : s.wt + ' lb'}</b></div>
-${s.date ? `<p class=mu style="margin:4px 0">${fmt(s.date)} · ${ago(s.since)}</p>` : '<p class=mu style="margin:4px 0">No weight yet</p>'}
+${s.date ? `<p class=mu style="margin:4px 0">Last weigh on ${fmt(s.date)} · ${ago(s.since)}</p>` : '<p class=mu style="margin:4px 0">No weight yet</p>'}
 <div class="pb${s.atTarget ? ' ok' : ''}"><i style="width:${pct.toFixed(0)}%"></i></div>
 ${selecting ? '' : targetControls(a)}
 ${finishBlock(s)}
@@ -165,9 +165,9 @@ ${selecting ? '' : `<button type=button class=mini style="margin-top:8px" onclic
 }
 
 function typicalV(g) {
-  const typical = g.typical ? fmt(g.typical) : '—';
-  const early = g.earliest ? fmt(g.earliest) : '—';
-  const late = g.latest ? fmt(g.latest) : '—';
+  const typical = g.typical ? fmt(g.typical, false) : '—';
+  const early = g.earliest ? fmt(g.earliest, false) : '—';
+  const late = g.latest ? fmt(g.latest, false) : '—';
   return `<div class="band fin"><div><b>${typical}</b>typical</div><div><b>${early}</b>earliest</div><div><b>${late}</b>latest</div></div>`;
 }
 
@@ -293,7 +293,7 @@ function draw() {
   if (S.view !== 'c') { S.mode = null; S.sel = []; S.ra = null; S.rm = false; S.rc = false; }
   if (S.view !== 'l' && !S.data) S.view = 'l';
   $('#app').innerHTML = S.view === 'l' ? loginV() : S.view === 'p' ? prodV() : clientV(S.cur);
-  if (S.view !== 'l' && S.mode !== 'weigh' && S.mode !== 'hist') $('#app').insertAdjacentHTML('beforeend', '<button type="button" class="signout" onclick="signOut()">Sign out</button>');
+  if (S.view !== 'l' && S.mode !== 'weigh' && S.mode !== 'hist' && S.mode !== 'sel' && S.mode !== 'conf') $('#app').insertAdjacentHTML('beforeend', '<button type="button" class="signout" onclick="signOut()">Sign out</button>');
   if (S.view === 'c' && S.role === 'producer' && !S.mode && clientOf(S.cur)) $('#app').insertAdjacentHTML('beforeend', `<button type="button" class="rm${S.rm ? ' on' : ''}" onclick="removeClient('${S.cur}')">${S.rm ? 'Confirm remove client' : 'Remove client'}</button>${S.rm ? '<p class=mu>This deletes the client, their cattle, and their weights. It cannot be undone.</p>' : ''}`);
   const top = document.getElementById('top');
   if (top) top.hidden = S.view !== 'l';
@@ -854,7 +854,7 @@ function openHow(kind) {
   ] : [
     'Sign in once with the 6-character code from your producer. It stays signed in on this phone.',
     'On an iPhone, tap Share, then Add to Home Screen, so it opens like an app in the truck or at the lot.',
-    'The top of the page shows head, average pounds, and pounds per day. Under that are typical, earliest, and latest. Those dates are for cattle still short of their target.',
+    'The top of the page shows head, pounds per day, and average pounds. Under that are typical, earliest, and latest. Those dates are for cattle still short of their target.',
     'Each tag shows the latest weight and a date for reaching the target. That date appears after the second weigh-in. A very small daily gain does not get a date.',
     'Find a tag to jump to one animal. Weights shows every weigh-in for that tag.',
     'The number marked target lb is shared with your producer. Either of you can change it. Open the app again to see a change made on the other phone.',
