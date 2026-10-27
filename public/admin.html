@@ -9,12 +9,15 @@ button{background:#f5b942;color:#000;font-weight:700;border:0}pre{white-space:pr
 <input id=secret type=password placeholder="Admin secret">
 <input id=name placeholder="Producer / business name">
 <input id=email type=email placeholder="Producer's email">
-<button onclick="go()">Create account</button>
+<button type="button" onclick="go()">Create account</button>
 <pre id=out></pre>
 <script>
+function field(id){ return document.getElementById(id).value.trim(); }
 async function go(){
+ const body = { secret: field('secret'), name: field('name'), email: field('email') };
+ if (!body.name || !body.email) { out.textContent = 'Enter the producer name and email.'; return; }
  const r=await fetch('/.netlify/functions/create-producer',{method:'POST',headers:{'content-type':'application/json'},
-  body:JSON.stringify({secret:secret.value,name:name.value,email:email.value})});
+  body:JSON.stringify(body)});
  const d=await r.json();
  out.textContent=r.ok?('Created. Producer code to email them:\n\n'+d.producer.code):('Error: '+d.error);
 }
