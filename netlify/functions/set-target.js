@@ -18,7 +18,7 @@ exports.handler = async (event) => {
   if (!all && !animalId) return json(400, { error: 'Missing animal' });
   let q = db.from('animals').update({ target_lb: lb }).eq('client_id', clientId);
   q = all ? q.eq('status', 'active') : q.eq('id', animalId);
-  const { error } = await q;
-  if (error) return json(500, { error: 'Could not update target' });
+  const { data, error } = await q.select('id');
+  if (error || !data || !data.length) return json(500, { error: 'Could not update target' });
   return json(200, { targetLb: lb });
 };

@@ -77,12 +77,12 @@ function parseIsoDate(s) {
   return s;
 }
 
-// Whole pounds. Commas are allowed ("1,450"). Outside 50–5000 is refused.
+// Whole pounds. Commas are allowed ("1,450"). Decimals are refused.
 function parseWeight(v) {
   const s = String(v == null ? '' : v).trim().replace(/,/g, '');
-  if (!/^\d+(\.\d+)?$/.test(s)) return null;
-  const n = Math.round(Number(s));
-  if (n < 50 || n > 5000) return null;
+  if (!/^\d+$/.test(s)) return null;
+  const n = Number(s);
+  if (!n) return null;
   return n;
 }
 

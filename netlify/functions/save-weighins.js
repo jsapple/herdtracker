@@ -37,7 +37,7 @@ exports.handler = async (event) => {
 
   for (const entry of entries) {
     const weight = parseWeight(entry.weight);
-    if (weight == null) return json(400, { error: 'Enter a whole number of pounds from 50 to 5,000.' });
+    if (weight == null) return json(400, { error: 'Enter a whole number of pounds.' });
 
     let animal = entry.animalId ? byId[entry.animalId] : null;
     if (entry.animalId && !animal) return json(404, { error: 'Animal not found' });

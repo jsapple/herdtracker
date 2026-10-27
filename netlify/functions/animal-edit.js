@@ -54,7 +54,7 @@ exports.handler = async (event) => {
     const date = parseIsoDate(body.date);
     const weight = parseWeight(body.weight);
     if (!date) return json(400, { error: 'Pick a real date. Future dates are not saved.' });
-    if (weight == null) return json(400, { error: 'Enter a whole number of pounds from 50 to 5,000.' });
+    if (weight == null) return json(400, { error: 'Enter a whole number of pounds.' });
     const previousDate = body.previousDate ? parseIsoDate(body.previousDate) : null;
     if (body.previousDate && !previousDate) return json(400, { error: 'Pick a real date. Future dates are not saved.' });
 

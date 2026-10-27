@@ -7,7 +7,7 @@ const dev = ls('ht_dev') || (() => { const d = crypto.randomUUID ? crypto.random
 
 const S = {
   view: 'l', role: null, id: null, data: null, cur: null, fails: 0,
-  mode: null, sel: [], rc: false, ra: null, sh: false, busy: false,
+  mode: null, sel: [], rc: false, rm: false, ra: null, sh: false, busy: false,
   weighDate: null, draft: {}, newRows: [], hist: null,
   q: '', wq: '', cut: null, del: null, skipCapture: false
 };
@@ -145,14 +145,8 @@ function finishBlock(s) {
   if (s.estimateNote === 'low') return `<p class=mu>Gain is too low to estimate a date.</p><p class=mu>${s.toGo} lb to go</p>`;
   return `<p class=mu>Weigh again to estimate a date.</p><p class=mu>${s.toGo} lb to go</p>`;
 }
-function rates(s) {
-  const parts = [];
-  if (s.adg != null) parts.push(s.adg.toFixed(2) + ' lb/day last weigh');
-  if (s.lifeAdg != null) parts.push(s.lifeAdg.toFixed(2) + ' since arrival');
-  return parts.length ? `<span class=ag>${parts.join(' · ')}</span>` : '';
-}
 function targetControls(a) {
-  return `<div class=tg><input inputmode=numeric value="${a.targetLb}" onchange="setTargetInput('${a.id}',this.value)" aria-label="Target weight in pounds"><span>target lb</span></div>`;
+  return `<div class=tg><input inputmode=numeric value="${a.targetLb}" onchange="setTargetInput('${a.id}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" aria-label="Target weight in pounds"><span>target lb</span></div>`;
 }
 function animalV(a, g, selecting) {
   const s = st(a);
@@ -165,7 +159,6 @@ ${s.date ? `<p class=mu style="margin:4px 0">${fmt(s.date)} · ${ago(s.since)}</
 <div class="pb${s.atTarget ? ' ok' : ''}"><i style="width:${pct.toFixed(0)}%"></i></div>
 ${selecting ? '' : targetControls(a)}
 ${finishBlock(s)}
-${rates(s)}
 ${slow ? '<div class=wa>gaining slower than this group</div>' : ''}
 ${selecting ? '' : `<button type=button class=mini style="margin-top:8px" onclick="openHist('${a.id}')">Weights</button>`}
 </div>`;
@@ -175,7 +168,7 @@ function typicalV(g) {
   const typical = g.typical ? fmt(g.typical) : '—';
   const early = g.earliest ? fmt(g.earliest) : '—';
   const late = g.latest ? fmt(g.latest) : '—';
-  return `<div class="band fin"><div><b>${typical}</b>typical finish</div><div><b>${early}</b>earliest</div><div><b>${late}</b>latest</div></div>`;
+  return `<div class="band fin"><div><b>${typical}</b>typical</div><div><b>${early}</b>earliest</div><div><b>${late}</b>latest</div></div>`;
 }
 
 function shipV(clientId, p) {
@@ -217,7 +210,7 @@ ${typicalV(g)}
 ${actions}
 ${selecting ? '<p class=mu>Tap each animal that went on the truck.</p>' : ''}
 <input id=q inputmode=numeric placeholder="Find a tag" value="${attr(S.q)}" oninput="filterTags(this.value)" autocomplete=off aria-label="Find a tag">
-<div id=herd>${animals.map((a) => animalV(a, g, selecting)).join('') || '<p class=mu>No active animals. Enter weights to add the first tags.</p>'}</div>
+<div id=herd>${animals.map((a) => animalV(a, g, selecting)).join('') || `<p class=mu>${p ? 'No active animals. Tap Weigh, then Add a tag.' : 'No active animals.'}</p>`}</div>
 ${selecting ? `<div class=sb><button type=button class=sm onclick="S.mode=null;S.sel=[];draw()">Cancel</button><button type=button class=bt2 ${S.sel.length ? '' : 'disabled'} onclick="S.mode='conf';draw()">Ship ${S.sel.length}</button></div>` : ''}
 </div>
 ${shipV(id, p)}
@@ -228,18 +221,6 @@ function weightOn(a, date) {
   const hit = (a.weighins || []).find((w) => w[0] === date);
   return hit ? String(hit[1]) : '';
 }
-function priorLine(a, date) {
-  const w = (a.weighins || []).slice().sort((x, y) => x[0].localeCompare(y[0]));
-  const before = w.filter((x) => x[0] < date);
-  const on = w.find((x) => x[0] === date);
-  const bits = [];
-  if (before.length) {
-    const p = before[before.length - 1];
-    bits.push('Last ' + p[1] + ' lb · ' + fmt(p[0]));
-  } else if (!on) bits.push('No weight yet');
-  if (on) bits.push('Already ' + on[1] + ' lb on this date');
-  return bits.join('<br>') || 'No weight yet';
-}
 function weighV(clientId) {
   const date = S.weighDate || today();
   S.weighDate = date;
@@ -248,10 +229,9 @@ function weighV(clientId) {
   const rows = animals.map((a) => {
     const val = Object.prototype.hasOwnProperty.call(S.draft, a.id) ? S.draft[a.id] : weightOn(a, date);
     const hide = q && String(a.tag).indexOf(q) === -1;
-    return `<div class="row wrow" data-tag="${attr(a.tag)}"${hide ? ' hidden' : ''}><div><div class=wtag>${esc(a.tag)}</div><div class=wlast>${priorLine(a, date)}</div></div><input data-wid="${a.id}" inputmode=numeric enterkeyhint=next autocomplete=off placeholder="lb" aria-label="Weight in pounds for ${attr(a.tag)}" value="${attr(val)}" oninput="S.draft[this.dataset.wid]=this.value;parkWeigh()" onkeydown="if(event.key==='Enter'){event.preventDefault();nextEmpty(this)}"></div>`;
+    return `<div class="row wrow" data-tag="${attr(a.tag)}"${hide ? ' hidden' : ''}><div class=wtag>${esc(a.tag)}</div><input data-wid="${a.id}" inputmode=numeric enterkeyhint=next autocomplete=off placeholder="lb" aria-label="Weight in pounds for ${attr(a.tag)}" value="${attr(val)}" oninput="S.draft[this.dataset.wid]=this.value;parkWeigh()" onkeydown="if(event.key==='Enter'){event.preventDefault();nextEmpty(this)}"></div>`;
   }).join('') || '<p class=mu>No animals yet. Add a tag below.</p>';
-  const news = (S.newRows.length ? S.newRows : [{ tag: '', weight: '' }]).map((row, i) => `<div class="pair newtag" data-new><input class=nt inputmode=numeric enterkeyhint=next placeholder="Tag" value="${attr(row.tag || '')}" aria-label="New tag" autocomplete=off oninput="parkWeigh()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.parentNode.querySelector('.nw').focus()}"><input class=nw inputmode=numeric enterkeyhint=next placeholder="lb" value="${attr(row.weight || '')}" aria-label="Weight for new tag" autocomplete=off oninput="parkWeigh()" onkeydown="if(event.key==='Enter'){event.preventDefault();nextEmpty(this)}">${S.newRows.length > 1 ? `<button type=button class="mini bad" onclick="removeNewRow(${i})">Remove</button>` : ''}</div>`).join('');
-  const waiting = parkedFor(clientId) ? '<p class=wlast>Saved on this phone, waiting for signal.</p>' : '';
+  const waiting = parkedFor(clientId) ? '<p class=mu>Saved on this phone, waiting for signal.</p>' : '';
   return `<button type=button class=lk onclick="backToList()">‹ Back</button>
 <div class=card><div class=hd>Weigh date</div>
 <input type=date id=wd value="${date}" onchange="setWeighDate(this.value)">
@@ -262,9 +242,9 @@ ${rows}
 <div class="sb sit"><button type=button class=sm onclick="backToList()">Back</button><button type=button class=bt2 id=savew onclick="saveWeigh('${clientId}')">Save weights</button></div>
 </div>
 <div class=card><div class=hd>Add a tag</div>
-<p class=mu>A new tag number, and its weight. This does not change the tags already listed above.</p>
-${news}
-<button type=button class=sm2 onclick="addNewRow()">Add another tag</button>
+<p class=mu>Type the new tag number and save it. Enter the weight next to that tag in the list above.</p>
+<input id=newtag inputmode=numeric enterkeyhint=done placeholder="Tag" autocomplete=off aria-label="New tag" onkeydown="if(event.key==='Enter'){event.preventDefault();saveTag('${clientId}')}">
+<button type=button class=sm2 style="width:100%" onclick="saveTag('${clientId}')">Save tag</button>
 </div>`;
 }
 
@@ -310,10 +290,11 @@ function clientV(id) {
 function draw() {
   if (S.mode === 'weigh' && !S.skipCapture) captureWeigh();
   S.skipCapture = false;
-  if (S.view !== 'c') { S.mode = null; S.sel = []; S.ra = null; }
+  if (S.view !== 'c') { S.mode = null; S.sel = []; S.ra = null; S.rm = false; S.rc = false; }
   if (S.view !== 'l' && !S.data) S.view = 'l';
   $('#app').innerHTML = S.view === 'l' ? loginV() : S.view === 'p' ? prodV() : clientV(S.cur);
-  if (S.view !== 'l' && S.mode !== 'weigh') $('#app').insertAdjacentHTML('beforeend', '<button type="button" class="signout" onclick="signOut()">Sign out</button>');
+  if (S.view !== 'l' && S.mode !== 'weigh' && S.mode !== 'hist') $('#app').insertAdjacentHTML('beforeend', '<button type="button" class="signout" onclick="signOut()">Sign out</button>');
+  if (S.view === 'c' && S.role === 'producer' && !S.mode && clientOf(S.cur)) $('#app').insertAdjacentHTML('beforeend', `<button type="button" class="rm${S.rm ? ' on' : ''}" onclick="removeClient('${S.cur}')">${S.rm ? 'Confirm remove client' : 'Remove client'}</button>${S.rm ? '<p class=mu>This deletes the client, their cattle, and their weights. It cannot be undone.</p>' : ''}`);
   const top = document.getElementById('top');
   if (top) top.hidden = S.view !== 'l';
   if (S.q && document.getElementById('q')) filterTags(S.q);
@@ -380,10 +361,10 @@ async function loadProducer(opts) {
 
 function openClient(id) {
   leaveWeigh();
-  S.cur = id; S.view = 'c'; S.mode = null; S.sel = []; S.q = ''; S.wq = ''; S.rc = false; S.ra = null; S.del = null; S.cut = null;
+  S.cur = id; S.view = 'c'; S.mode = null; S.sel = []; S.q = ''; S.wq = ''; S.rc = false; S.rm = false; S.ra = null; S.del = null; S.cut = null;
   draw();
 }
-function backToClients() { leaveWeigh(); S.view = 'p'; S.mode = null; S.q = ''; S.wq = ''; S.cut = null; draw(); }
+function backToClients() { leaveWeigh(); S.view = 'p'; S.mode = null; S.q = ''; S.wq = ''; S.cut = null; S.rc = false; S.rm = false; draw(); }
 function backToList() { leaveWeigh(); S.mode = null; S.sel = []; S.hist = null; S.del = null; S.skipCapture = true; draw(); }
 
 // Signing out does not free a device slot. The device id stays linked.
@@ -410,8 +391,22 @@ async function shareCode(code) {
   try { if (navigator.share) await navigator.share({ text: t }); else { await navigator.clipboard.writeText(t); msg('Code copied.'); } } catch (e) { msg('Client code: ' + code); }
 }
 
+async function removeClient(clientId) {
+  if (!S.rm) { S.rm = true; S.rc = false; return draw(); }
+  const named = clientOf(clientId);
+  const name = named ? named.name : 'Client';
+  const { ok, d } = await api('remove-client', { producerId: S.id, deviceId: dev, clientId });
+  if (!ok) { S.rm = false; draw(); return msg(d.error || 'Could not remove the client.'); }
+  const parked = readPark();
+  if (parked && parked.clientId === clientId) writePark(null);
+  S.view = 'p'; S.cur = null; S.mode = null; S.rc = false;
+  await loadProducer({ keep: true, quiet: true });
+  draw();
+  msg(name + ' removed.');
+}
+
 async function reissueCode(clientId) {
-  if (!S.rc) { S.rc = true; return draw(); }
+  if (!S.rc) { S.rc = true; S.rm = false; return draw(); }
   const { ok, d } = await api('reissue-client-code', { producerId: S.id, deviceId: dev, clientId });
   S.rc = false;
   if (!ok) return msg(d.error || 'Could not reissue code.');
@@ -444,8 +439,12 @@ async function commitTarget(animalId, n) {
   const body = S.role === 'client'
     ? { role: 'client', clientId: S.id, deviceId: dev, animalId, targetLb: lb }
     : { role: 'producer', producerId: S.id, deviceId: dev, clientId: a.clientId, animalId, targetLb: lb };
-  const { ok, d } = await api('set-target', body);
-  if (!ok) msg(d.error || 'Could not save the target. It may revert on refresh.');
+  const { ok } = await api('set-target', body);
+  if (!ok) {
+    msg('Could not save the target.');
+    if (S.role === 'producer') await loadProducer({ keep: true });
+    else await loadClient();
+  }
 }
 function toggleSel(id) {
   S.sel = S.sel.includes(id) ? S.sel.filter((x) => x !== id) : [...S.sel, id];
@@ -552,17 +551,16 @@ function entriesFrom(draft, newRows, clientId) {
     const rawTag = String(row.tag || '').trim();
     const weight = String(row.weight || '').trim();
     if (!rawTag && !weight) continue;
+    if (!weight) continue;
     if (!rawTag) return { error: 'Enter a tag number for that weight.' };
     const tag = tagNum(rawTag);
     if (!tag) return { error: 'Enter the tag as a number.' };
-    if (!weight) return { error: 'Enter a weight for tag ' + tag + '.' };
     if (seenNew[tag]) return { error: 'Tag ' + tag + ' is entered more than once.' };
     seenNew[tag] = true;
     const active = activeOf(clientId).find((a) => tagNum(a.tag) === tag);
     if (active) return { error: 'Tag ' + tag + ' is already active on this client. Enter the weight next to it in the list.' };
     entries.push({ tag, weight });
   }
-  if (!entries.length) return { error: 'Enter at least one weight.' };
   return { entries };
 }
 async function flushPark() {
@@ -571,8 +569,34 @@ async function flushPark() {
   const p = readPark();
   if (!p || p.producerId !== S.id || p.hold) return;
   if (!S.data) return;
+  const tags = (p.tags || []).slice();
+  if (tags.length) {
+    S.flushing = true;
+    for (let i = 0; i < tags.length; i++) {
+      const sent = await api('add-tag', { producerId: S.id, deviceId: dev, clientId: p.clientId, tag: tags[i] });
+      if (!sent.ok && sent.status !== 409) {
+        S.flushing = false;
+        if (sent.status !== 0) {
+          p.hold = (sent.d && sent.d.error) || 'Could not save the tag.';
+          writePark(p);
+        }
+        return;
+      }
+    }
+    p.tags = [];
+    writePark(p);
+    S.flushing = false;
+  }
   const built = entriesFrom(p.draft, p.newRows, p.clientId);
   if (built.error) { p.hold = built.error; writePark(p); return; }
+  if (!built.entries.length) {
+    if (ls('ht_weigh') === snap) writePark(null);
+    if (tags.length) {
+      await loadProducer({ keep: true });
+      msg(tags.length + ' tag' + (tags.length === 1 ? '' : 's') + ' added.');
+    }
+    return;
+  }
   S.flushing = true;
   const { ok, d, status } = await api('save-weighins', { producerId: S.id, deviceId: dev, clientId: p.clientId, date: p.date, entries: built.entries });
   S.flushing = false;
@@ -667,6 +691,8 @@ function startWeigh() {
     return msg('Weights are still saved on this phone. Open those weights before starting another pen.');
   }
   S.mode = 'weigh';
+  S.rm = false;
+  S.rc = false;
   if (p && p.producerId === S.id && p.clientId === S.cur) {
     S.weighDate = p.date || today();
     S.draft = p.draft || {};
@@ -689,18 +715,32 @@ function setWeighDate(v) {
   draw();
   if (typed) msg('Date changed. The boxes show weights already saved for this date.');
 }
-function addNewRow() {
-  captureWeigh();
-  S.newRows.push({ tag: '', weight: '' });
+async function saveTag(clientId) {
+  if (S.busy) return;
+  const raw = (document.getElementById('newtag').value || '').trim();
+  const tag = tagNum(raw);
+  if (!tag) return msg('Enter the tag as a number.');
+  const active = activeOf(clientId).find((a) => tagNum(a.tag) === tag);
+  if (active) return msg('Tag ' + tag + ' is already active on this client. Enter the weight next to it in the list.');
+  S.busy = true;
+  const { ok, d, status } = await api('add-tag', { producerId: S.id, deviceId: dev, clientId, tag });
+  S.busy = false;
+  if (!ok) {
+    if (status === 0) {
+      const p = readPark() || { producerId: S.id, clientId, date: S.weighDate || today(), draft: dirtyDraft(S.draft, S.weighDate), newRows: [] };
+      if (p.clientId !== clientId) return msg('Weights are still saved on this phone for another client.');
+      p.tags = p.tags || [];
+      if (p.tags.indexOf(tag) === -1) p.tags.push(tag);
+      writePark(p);
+      document.getElementById('newtag').value = '';
+      return msg('Saved on this phone, waiting for signal.');
+    }
+    return msg((d && d.error) || 'Could not save the tag.');
+  }
+  document.getElementById('newtag').value = '';
   S.skipCapture = true;
-  draw();
-}
-function removeNewRow(i) {
-  captureWeigh();
-  S.newRows.splice(i, 1);
-  if (!S.newRows.length) S.newRows.push({ tag: '', weight: '' });
-  S.skipCapture = true;
-  draw();
+  await loadProducer({ keep: true });
+  msg('Tag ' + tag + ' added. Enter its weight in the list.');
 }
 async function saveWeigh(clientId) {
   if (S.busy) return;
@@ -717,11 +757,9 @@ async function saveWeigh(clientId) {
   for (const row of S.newRows) {
     const rawTag = String(row.tag || '').trim();
     const weight = String(row.weight || '').trim();
-    if (!rawTag && !weight) continue;
-    if (!rawTag) return msg('Enter a tag number for that weight.');
+    if (!rawTag || !weight) continue;
     const tag = tagNum(rawTag);
     if (!tag) return msg('Enter the tag as a number.');
-    if (!weight) return msg('Enter a weight for tag ' + tag + '.');
     if (seenNew[tag]) return msg('Tag ' + tag + ' is entered more than once.');
     seenNew[tag] = true;
     const active = activeOf(clientId).find((a) => tagNum(a.tag) === tag);
@@ -803,19 +841,23 @@ function openHow(kind) {
   const steps = producer ? [
     'Sign in once on this phone with your 8-character code. It stays signed in.',
     'Add a client at the bottom of your list. The page opens on that client and shows a 6-character code. Share that code. That is how the client sees their cattle.',
-    'Tap Weigh. The date is today on this phone. Change it when you are entering an older weigh-in.',
-    'Tags already in the herd are listed. Type the pounds next to the tag. Find a tag jumps to a number. Next on the keyboard moves to the next empty animal.',
-    'A brand-new tag goes under Add a tag, with its weight. A tag that is still active is typed once. Enter later weights next to it in the list.',
-    'If the signal drops, the weights stay on this phone and send when you have service again.',
+    'Remove client is at the bottom of that page. Tap it, then tap again to confirm. That deletes the client, their cattle, and every weight. It cannot be undone.',
+    'Reissue code makes a new 6-character code and signs the client phones out. The cattle stay.',
+    'Tap Weigh. The date is today on this phone. Change it when you are entering an older weigh-in. Use whole pounds. Decimals are not accepted.',
+    'Tags already in the herd are listed as numbers only. Type the pounds next to the tag. Find a tag jumps to a number. Next on the keyboard moves to the next empty animal.',
+    'A brand-new tag goes under Add a tag. Save the number only. Then enter its weight next to that tag in the list.',
+    'The target lb on each animal is shared with the client. Either of you can change it. The other phone shows the new number the next time the app is opened.',
+    'If the signal drops, weights and new tags stay on this phone and send when you have service again.',
     'Ship from the list when cattle leave. Reactivate only if that ship was marked by mistake.',
     'A shipped tag can be used again. That starts a new animal. The old weights stay on the shipped record.',
     'Download CSV or Print at the bottom of the page. The file and the paper copy are the record for you or the client.'
   ] : [
     'Sign in once with the 6-character code from your producer. It stays signed in on this phone.',
     'On an iPhone, tap Share, then Add to Home Screen, so it opens like an app in the truck or at the lot.',
-    'Each tag shows the latest weight, how it is gaining, and an estimated finish date. The date appears after the second weigh-in.',
+    'The top of the page shows head, average pounds, and pounds per day. Under that are typical, earliest, and latest. Those dates are for cattle still short of their target.',
+    'Each tag shows the latest weight and a date for reaching the target. That date appears after the second weigh-in. A very small daily gain does not get a date.',
     'Find a tag to jump to one animal. Weights shows every weigh-in for that tag.',
-    'The number marked target lb is the finish weight. You or your producer can change it. Both pages show the same number.',
+    'The number marked target lb is shared with your producer. Either of you can change it. Open the app again to see a change made on the other phone.',
     'Shipped cattle stay in the list below, with their own history. Those weights are not mixed into the cattle still on feed.',
     'Download CSV or Print at the bottom of this page to keep a copy.'
   ];
@@ -964,9 +1006,25 @@ if ('serviceWorker' in navigator) {
 }
 window.addEventListener('online', () => { if (S.role === 'producer') flushPark(); });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') stayAwake(S.role === 'producer' && S.view !== 'l');
-  else releaseAwake();
+  if (document.visibilityState === 'visible') {
+    stayAwake(S.role === 'producer' && S.view !== 'l');
+    refreshShared();
+  } else releaseAwake();
 });
 document.addEventListener('pointerdown', () => {
   if (S.role === 'producer' && S.view !== 'l') stayAwake(true);
 });
+
+let refreshing = false;
+async function refreshShared() {
+  if (refreshing || S.view === 'l' || !S.role || !S.id) return;
+  if (document.visibilityState === 'hidden') return;
+  if (S.mode === 'weigh' || S.mode === 'conf' || S.mode === 'sel' || S.mode === 'hist') return;
+  const el = document.activeElement;
+  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+  refreshing = true;
+  try {
+    if (S.role === 'producer') await loadProducer({ keep: true });
+    else await loadClient();
+  } finally { refreshing = false; }
+}
