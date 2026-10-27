@@ -61,8 +61,6 @@ function gainSort(a, b) {
   if (av !== bv) return av - bv;
   return tagSort(a, b);
 }
-const isDue = (a) => { const s = st(a); return s.wt == null || s.since >= 35; };
-
 function chart(animals) {
   const ser = HerdStats.chartSeries(animals);
   if (ser.length < 2) {
@@ -124,7 +122,6 @@ function reviewV() {
 function prodV() {
   const clients = clientsSorted();
   const head = allActive().length;
-  const due = allActive().filter(isDue).length;
   const list = clients.length ? `<div class=card>${clients.map((c) => {
     const g = grp(activeOf(c.id));
     const avg = g.avg == null ? '—' : Math.round(g.avg);
@@ -134,21 +131,11 @@ function prodV() {
   }).join('')}</div>` : '<div class=card><p class=mu>Add a client, then enter weights.</p></div>';
   return `<h2>All clients</h2>
 ${parkNote()}
-<div class=band><div><b>${head}</b>head</div><div><b>${clients.length}</b>clients</div><div><b>${due}</b>due to weigh</div></div>
+<div class=band><div><b>${head}</b>head</div><div><b>${clients.length}</b>clients</div></div>
 ${reviewV()}${list}
 ${deviceCard('producer', S.data.devices || [], '')}
 <div class=card><div class=hd>Add a client</div><input id=nn placeholder="Client name" onkeydown="if(event.key==='Enter')addClient()"><button class=bt onclick="addClient()">Add client and make code</button></div>
 ${pageTools('producer')}`;
-}
-
-function dueV(clientId) {
-  const list = activeOf(clientId).filter(isDue).sort(tagSort);
-  if (!list.length) return '';
-  return `<div class=card><div class=hd>Due to weigh</div>${list.map((a) => {
-    const s = st(a);
-    const note = s.wt == null ? 'No weight yet' : `Last weighed ${fmt(s.date)} · ${ago(s.since)}`;
-    return `<div class=row><div>${esc(a.tag)}<br><span class=mu>${note}</span></div></div>`;
-  }).join('')}</div>`;
 }
 
 function finishBlock(s) {
@@ -165,7 +152,7 @@ function rates(s) {
   return parts.length ? `<span class=ag>${parts.join(' · ')}</span>` : '';
 }
 function targetControls(a) {
-  return `<div class=tg><button type=button onclick="stepTarget('${a.id}',-25)" aria-label="Lower target 25 pounds">−</button><input inputmode=numeric value="${a.targetLb}" onchange="setTargetInput('${a.id}',this.value)" aria-label="Target weight in pounds"><button type=button onclick="stepTarget('${a.id}',25)" aria-label="Raise target 25 pounds">+</button></div>`;
+  return `<div class=tg><input inputmode=numeric value="${a.targetLb}" onchange="setTargetInput('${a.id}',this.value)" aria-label="Target weight in pounds"><span>target lb</span></div>`;
 }
 function animalV(a, g, selecting) {
   const s = st(a);
@@ -185,18 +172,10 @@ ${selecting ? '' : `<button type=button class=mini style="margin-top:8px" onclic
 }
 
 function typicalV(g) {
-  if (!g.typical) {
-    return `<div class=card><div class=hd>Typical finish</div><p class=mu>A finish date shows after two weigh-ins.</p>${g.waiting ? `<p class=mu>${g.waiting} still need another weigh</p>` : ''}</div>`;
-  }
-  return `<div class=card><div class=fin>Typical finish · ${fmt(g.typical)}</div><p class=mu>Earliest ${fmt(g.earliest)} · Latest ${fmt(g.latest)}</p>${g.waiting ? `<p class=mu>${g.waiting} still need another weigh</p>` : ''}${g.atTarget ? `<p class=mu>${g.atTarget} already at target</p>` : ''}</div>`;
-}
-
-function groupTargetV(clientId) {
-  const list = activeOf(clientId);
-  if (!list.length) return '';
-  const differ = new Set(list.map((a) => a.targetLb)).size > 1;
-  return `<div class=card><div class=hd>Target for every active animal</div>${differ ? '<p class=mu>Targets differ until you set them all.</p>' : ''}
-<div class=tg><button type=button onclick="stepGroup('${clientId}',-25)" aria-label="Lower every target 25 pounds">−</button><input id=gt inputmode=numeric value="${list[0].targetLb}" onchange="commitGroupTarget('${clientId}',this.value)" aria-label="Target for every active animal"><button type=button onclick="stepGroup('${clientId}',25)" aria-label="Raise every target 25 pounds">+</button></div></div>`;
+  const typical = g.typical ? fmt(g.typical) : '—';
+  const early = g.earliest ? fmt(g.earliest) : '—';
+  const late = g.latest ? fmt(g.latest) : '—';
+  return `<div class="band fin"><div><b>${typical}</b>typical finish</div><div><b>${early}</b>earliest</div><div><b>${late}</b>latest</div></div>`;
 }
 
 function shipV(clientId, p) {
@@ -228,13 +207,14 @@ function shipV(clientId, p) {
 function clientMain(id, g, p) {
   const selecting = S.mode === 'sel';
   const animals = activeOf(id).slice().sort(gainSort);
-  return `${dueV(id)}
-${band(g.head, g.avg, g.adg)}
+  const actions = p && !selecting
+    ? `<div class=act><button type=button class=weigh onclick="startWeigh()">Weigh</button>${!S.mode && animals.length ? '<button type=button class=ship onclick="startShip()">Ship</button>' : ''}</div>`
+    : '';
+  return `${band(g.head, g.avg, g.adg)}
 ${typicalV(g)}
 <div class=card><div class=hd>Average weight</div>${chart(activeOf(id))}</div>
-${groupTargetV(id)}
 <div class=card>
-<div class=hr><div class=hd>Each animal</div>${p && !selecting ? '<button type=button class=sm2 onclick="startWeigh()">Weigh</button>' : ''}${p && !S.mode && animals.length ? '<button type=button class=sm2 onclick="startShip()">Ship</button>' : ''}</div>
+${actions}
 ${selecting ? '<p class=mu>Tap each animal that went on the truck.</p>' : ''}
 <input id=q inputmode=numeric placeholder="Find a tag" value="${attr(S.q)}" oninput="filterTags(this.value)" autocomplete=off aria-label="Find a tag">
 <div id=herd>${animals.map((a) => animalV(a, g, selecting)).join('') || '<p class=mu>No active animals. Enter weights to add the first tags.</p>'}</div>
@@ -268,9 +248,9 @@ function weighV(clientId) {
   const rows = animals.map((a) => {
     const val = Object.prototype.hasOwnProperty.call(S.draft, a.id) ? S.draft[a.id] : weightOn(a, date);
     const hide = q && String(a.tag).indexOf(q) === -1;
-    return `<div class="row wrow" data-tag="${attr(a.tag)}"${hide ? ' hidden' : ''}><div><div class=wtag>${esc(a.tag)}</div><div class=wlast>${priorLine(a, date)}</div></div><input data-wid="${a.id}" inputmode=numeric enterkeyhint=next autocomplete=off aria-label="Weight for ${attr(a.tag)}" value="${attr(val)}" oninput="S.draft[this.dataset.wid]=this.value;parkWeigh()" onkeydown="if(event.key==='Enter'){event.preventDefault();nextEmpty(this)}"></div>`;
+    return `<div class="row wrow" data-tag="${attr(a.tag)}"${hide ? ' hidden' : ''}><div><div class=wtag>${esc(a.tag)}</div><div class=wlast>${priorLine(a, date)}</div></div><input data-wid="${a.id}" inputmode=numeric enterkeyhint=next autocomplete=off placeholder="lb" aria-label="Weight in pounds for ${attr(a.tag)}" value="${attr(val)}" oninput="S.draft[this.dataset.wid]=this.value;parkWeigh()" onkeydown="if(event.key==='Enter'){event.preventDefault();nextEmpty(this)}"></div>`;
   }).join('') || '<p class=mu>No animals yet. Add a tag below.</p>';
-  const news = (S.newRows.length ? S.newRows : [{ tag: '', weight: '' }]).map((row, i) => `<div class=pair data-new style="margin:8px 0"><input class=nt inputmode=numeric enterkeyhint=next placeholder="Tag" value="${attr(row.tag || '')}" aria-label="New tag" autocomplete=off oninput="parkWeigh()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.parentNode.querySelector('.nw').focus()}"><input class=nw inputmode=numeric enterkeyhint=next placeholder="lb" value="${attr(row.weight || '')}" aria-label="Weight for new tag" autocomplete=off oninput="parkWeigh()" onkeydown="if(event.key==='Enter'){event.preventDefault();nextEmpty(this)}" style="flex:none;width:128px;font-size:32px;font-weight:800;text-align:center">${S.newRows.length > 1 ? `<button type=button class="mini bad" onclick="removeNewRow(${i})">Remove</button>` : ''}</div>`).join('');
+  const news = (S.newRows.length ? S.newRows : [{ tag: '', weight: '' }]).map((row, i) => `<div class="pair newtag" data-new><input class=nt inputmode=numeric enterkeyhint=next placeholder="Tag" value="${attr(row.tag || '')}" aria-label="New tag" autocomplete=off oninput="parkWeigh()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.parentNode.querySelector('.nw').focus()}"><input class=nw inputmode=numeric enterkeyhint=next placeholder="lb" value="${attr(row.weight || '')}" aria-label="Weight for new tag" autocomplete=off oninput="parkWeigh()" onkeydown="if(event.key==='Enter'){event.preventDefault();nextEmpty(this)}">${S.newRows.length > 1 ? `<button type=button class="mini bad" onclick="removeNewRow(${i})">Remove</button>` : ''}</div>`).join('');
   const waiting = parkedFor(clientId) ? '<p class=wlast>Saved on this phone, waiting for signal.</p>' : '';
   return `<button type=button class=lk onclick="backToList()">‹ Back</button>
 <div class=card><div class=hd>Weigh date</div>
@@ -279,10 +259,12 @@ function weighV(clientId) {
 ${waiting}
 <input id=wq inputmode=numeric placeholder="Find a tag" value="${attr(S.wq || '')}" autocomplete=off aria-label="Find a tag" oninput="filterWeigh(this.value)">
 ${rows}
-<div class=hd style="margin-top:16px">Add a tag</div>
+<div class="sb sit"><button type=button class=sm onclick="backToList()">Back</button><button type=button class=bt2 id=savew onclick="saveWeigh('${clientId}')">Save weights</button></div>
+</div>
+<div class=card><div class=hd>Add a tag</div>
+<p class=mu>A new tag number, and its weight. This does not change the tags already listed above.</p>
 ${news}
 <button type=button class=sm2 onclick="addNewRow()">Add another tag</button>
-<div class=sb><button type=button class=sm onclick="backToList()">Back</button><button type=button class=bt2 id=savew onclick="saveWeigh('${clientId}')">Save weights</button></div>
 </div>`;
 }
 
@@ -331,18 +313,11 @@ function draw() {
   if (S.view !== 'c') { S.mode = null; S.sel = []; S.ra = null; }
   if (S.view !== 'l' && !S.data) S.view = 'l';
   $('#app').innerHTML = S.view === 'l' ? loginV() : S.view === 'p' ? prodV() : clientV(S.cur);
-  $('#out').hidden = S.view === 'l';
-  const brand = document.getElementById('brand');
-  if (brand) {
-    let name = 'Herd Tracker';
-    if (S.view !== 'l' && S.data) {
-      if (S.role === 'producer' && S.data.producer && S.data.producer.name) name = S.data.producer.name;
-      else if (S.data.producerName) name = S.data.producerName;
-    }
-    brand.textContent = name;
-  }
+  if (S.view !== 'l' && S.mode !== 'weigh') $('#app').insertAdjacentHTML('beforeend', '<button type="button" class="signout" onclick="signOut()">Sign out</button>');
+  const top = document.getElementById('top');
+  if (top) top.hidden = S.view !== 'l';
   if (S.q && document.getElementById('q')) filterTags(S.q);
-  stayAwake(S.mode === 'weigh');
+  stayAwake(S.role === 'producer' && S.view !== 'l');
 }
 
 function filterTags(v) {
@@ -358,7 +333,7 @@ function filterTags(v) {
 async function login() {
   if (S.fails >= 5) return msg('Too many tries. Wait and try again, or ask for a new code.');
   const code = $('#code').value.trim().toUpperCase();
-  if (code.length === 8) return producerLogin(code);
+  if (code.length === 8) { stayAwake(true); return producerLogin(code); }
   if (code.length === 6) return clientLogin(code);
   msg('Enter the 6-character client code or the 8-character producer code.');
 }
@@ -373,7 +348,7 @@ async function clientLogin(code) {
 
 async function producerLogin(code) {
   const { ok, d } = await api('producer-login', { code, deviceId: dev });
-  if (!ok) { S.fails++; return msg(d.error || 'Sign-in failed.'); }
+  if (!ok) { releaseAwake(); S.fails++; return msg(d.error || 'Sign-in failed.'); }
   ls('ht_role', 'producer'); ls('ht_id', d.producer.id);
   S.role = 'producer'; S.id = d.producer.id;
   await loadProducer();
@@ -456,10 +431,6 @@ async function removeDevice(scope, clientId, removeId) {
   msg('Device removed. The sign-in code still works.');
 }
 
-function stepTarget(animalId, delta) {
-  const a = animalById(animalId);
-  commitTarget(animalId, a.targetLb + delta);
-}
 function setTargetInput(animalId, v) {
   const n = parseInt(String(v).replace(/\D/g, ''), 10);
   if (!n) return;
@@ -476,21 +447,6 @@ async function commitTarget(animalId, n) {
   const { ok, d } = await api('set-target', body);
   if (!ok) msg(d.error || 'Could not save the target. It may revert on refresh.');
 }
-function stepGroup(clientId, delta) {
-  const cur = parseInt($('#gt').value, 10) || activeOf(clientId)[0].targetLb;
-  commitGroupTarget(clientId, cur + delta);
-}
-async function commitGroupTarget(clientId, n) {
-  const body = S.role === 'client'
-    ? { role: 'client', clientId: S.id, deviceId: dev, all: true, targetLb: n }
-    : { role: 'producer', producerId: S.id, deviceId: dev, clientId, all: true, targetLb: n };
-  const { ok, d } = await api('set-target', body);
-  if (!ok) return msg(d.error || 'Could not save the target.');
-  if (S.role === 'client') await loadClient();
-  else await loadProducer({ keep: true });
-  msg('Target set to ' + d.targetLb + ' lb for every active animal.');
-}
-
 function toggleSel(id) {
   S.sel = S.sel.includes(id) ? S.sel.filter((x) => x !== id) : [...S.sel, id];
   draw();
@@ -637,18 +593,37 @@ async function flushPark() {
   if (ls('ht_weigh')) flushPark();
 }
 let wakeLock;
+let wakeVideo;
 async function stayAwake(on) {
+  if (!on) { releaseAwake(); return; }
   try {
-    if (on) {
-      if (wakeLock) return;
-      if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen');
-    } else releaseAwake();
+    if (navigator.wakeLock && (!wakeLock || wakeLock.released)) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
   } catch (e) { wakeLock = null; }
+  try {
+    const v = ensureWakeVideo();
+    if (v.paused) await v.play();
+  } catch (e) {}
+}
+function ensureWakeVideo() {
+  if (wakeVideo) return wakeVideo;
+  const v = document.createElement('video');
+  v.setAttribute('playsinline', '');
+  v.setAttribute('webkit-playsinline', '');
+  v.muted = true;
+  v.loop = true;
+  v.src = v.canPlayType('video/mp4') ? '/wake.mp4' : '/wake.webm';
+  v.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none';
+  document.body.appendChild(v);
+  wakeVideo = v;
+  return v;
 }
 function releaseAwake() {
   const lock = wakeLock;
   wakeLock = null;
   if (lock) lock.release().catch(() => {});
+  if (wakeVideo && !wakeVideo.paused) wakeVideo.pause();
 }
 function filterWeigh(v) {
   S.wq = v;
@@ -840,7 +815,7 @@ function openHow(kind) {
     'On an iPhone, tap Share, then Add to Home Screen, so it opens like an app in the truck or at the lot.',
     'Each tag shows the latest weight, how it is gaining, and an estimated finish date. The date appears after the second weigh-in.',
     'Find a tag to jump to one animal. Weights shows every weigh-in for that tag.',
-    'The target is the finish weight. You can raise or lower it.',
+    'The number marked target lb is the finish weight. You or your producer can change it. Both pages show the same number.',
     'Shipped cattle stay in the list below, with their own history. Those weights are not mixed into the cattle still on feed.',
     'Download CSV or Print at the bottom of this page to keep a copy.'
   ];
@@ -989,5 +964,9 @@ if ('serviceWorker' in navigator) {
 }
 window.addEventListener('online', () => { if (S.role === 'producer') flushPark(); });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && S.mode === 'weigh') stayAwake(true);
+  if (document.visibilityState === 'visible') stayAwake(S.role === 'producer' && S.view !== 'l');
+  else releaseAwake();
+});
+document.addEventListener('pointerdown', () => {
+  if (S.role === 'producer' && S.view !== 'l') stayAwake(true);
 });
