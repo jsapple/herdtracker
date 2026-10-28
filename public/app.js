@@ -66,13 +66,25 @@ function chart(animals) {
   if (ser.length < 2) {
     return `<p class=mu>${ser.length ? 'Another weigh-in will show the trend.' : 'Enter weights to see the trend.'}</p>`;
   }
-  const W = 320, H = 140, P = 36;
+  const W = 320, H = 168, P = 42;
   const xs = ser.map((s) => Date.parse(s[0])), ys = ser.map((s) => s[1]);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys) - 8, y1 = Math.max(...ys) + 8;
-  const X = (t) => P + (t - x0) / (x1 - x0 || 1) * (W - P - 6);
-  const Y = (v) => H - 20 - (v - y0) / (y1 - y0 || 1) * (H - 34);
-  const pts = ser.map((s) => X(Date.parse(s[0])).toFixed(1) + ',' + Y(s[1]).toFixed(1)).join(' ');
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Average weight over time"><polyline class="l" points="${pts}"/><text class="t" x="${P}" y="${H - 4}">${fmt(ser[0][0])}</text><text class="t" x="${W - 6}" y="${H - 4}" text-anchor="end">${fmt(ser[ser.length - 1][0])}</text><text class="t" x="0" y="12">${Math.round(y1)}</text><text class="t" x="0" y="${H - 22}">${Math.round(y0)}</text></svg>`;
+  const lo = Math.min(...ys), hi = Math.max(...ys);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const pad = Math.max(8, (hi - lo) * 0.2);
+  const y0 = lo - pad, y1 = hi + pad;
+  const top = 18, bot = H - 22;
+  const X = (t) => P + (t - x0) / (x1 - x0 || 1) * (W - P - 10);
+  const Y = (v) => bot - (v - y0) / (y1 - y0 || 1) * (bot - top);
+  const coords = ser.map((s) => [X(Date.parse(s[0])), Y(s[1])]);
+  const n = (v) => v.toFixed(1);
+  const line = coords.map((p) => n(p[0]) + ',' + n(p[1])).join(' ');
+  const area = `M${n(coords[0][0])},${n(bot)} ` + coords.map((p) => `L${n(p[0])},${n(p[1])}`).join(' ') + ` L${n(coords[coords.length - 1][0])},${n(bot)} Z`;
+  const dots = coords.map((p, i) => `<circle cx="${n(p[0])}" cy="${n(p[1])}" r="${i === coords.length - 1 ? 5.5 : 3.5}" fill="#f5b942"/>`).join('');
+  const last = coords[coords.length - 1];
+  const lb = Math.round(ys[ys.length - 1]);
+  const labelLeft = last[0] > W * 0.62;
+  const labelY = Math.max(14, last[1] - 10);
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Average Weight Gains"><defs><linearGradient id="awg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffe08a" stop-opacity="0.75"/><stop offset="42%" stop-color="#f5b942" stop-opacity="0.38"/><stop offset="100%" stop-color="#f5b942" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#awg)"/><polyline class="l" points="${line}"/>${dots}<text class="t lb" x="${n(last[0] + (labelLeft ? -8 : 8))}" y="${n(labelY)}" text-anchor="${labelLeft ? 'end' : 'start'}">${lb} lb</text><text class="t" x="${P}" y="${H - 4}">${fmt(ser[0][0])}</text><text class="t" x="${W - 6}" y="${H - 4}" text-anchor="end">${fmt(ser[ser.length - 1][0])}</text><text class="t" x="2" y="${n(Y(hi) + 4)}">${Math.round(hi)}</text><text class="t" x="2" y="${n(Y(lo))}">${Math.round(lo)}</text></svg>`;
 }
 
 function band(h, a, g) {
@@ -125,12 +137,11 @@ function prodV() {
   const list = clients.length ? `<div class=card>${clients.map((c) => {
     const g = grp(activeOf(c.id));
     const adg = g.adg == null ? '—' : g.adg.toFixed(2);
-    const slow = g.slower.length ? `<br><span class=wa>${g.slower.length} gaining slower</span>` : '';
-    return `<div class="row go" onclick="openClient('${c.id}')"><div><b>${esc(c.name)}</b></div><div class=rt>${adg} <small>lb/day</small>${slow}</div></div>`;
+    return `<div class="row go" onclick="openClient('${c.id}')"><div><b>${esc(c.name)}</b></div><div class=rt>${adg} <small>lb/day</small></div></div>`;
   }).join('')}</div>` : '<div class=card><p class=mu>Add a client, then enter weights.</p></div>';
   return `<h2>All clients</h2>
 ${parkNote()}
-<div class=band><div><b>${head}</b>head</div><div><b>${clients.length}</b>clients</div></div>
+<div class=band><div><b>${clients.length}</b>clients</div><div><b>${head}</b>head</div></div>
 ${reviewV()}${list}
 ${deviceCard('producer', S.data.devices || [], '')}
 <div class=card><div class=hd>Add a client</div><input id=nn placeholder="Client name" onkeydown="if(event.key==='Enter')addClient()"><button class=bt onclick="addClient()">Add client and make code</button></div>
@@ -204,7 +215,7 @@ function clientMain(id, g, p) {
     : '';
   return `${band(g.head, g.avg, g.adg)}
 ${typicalV(g)}
-<div class=card><div class=hd>Average weight</div>${chart(activeOf(id))}</div>
+<div class=card><div class="hd c soft">Average Weight Gains</div>${chart(activeOf(id))}</div>
 <div class=card>
 ${actions}
 ${selecting ? '<p class=mu>Tap each animal that went on the truck.</p>' : ''}
@@ -276,7 +287,7 @@ function clientV(id) {
   const g = grp(activeOf(id));
   const crumb = p && !S.mode ? '<button type=button class=lk onclick="backToClients()">‹ All clients</button>' : '';
   const head = `<h2>${esc(c.name)}</h2>`;
-  const code = p && !S.mode ? `<p class=mu>Client code <b>${esc(c.code)}</b> · ${(c.devices || []).length} of 4 devices</p><div class=cb><button type=button onclick="shareCode('${esc(c.code)}')">Share code</button><button type=button class="${S.rc ? 'cf' : ''}" onclick="reissueCode('${id}')">${S.rc ? 'Confirm reissue' : 'Reissue code'}</button></div>${deviceCard('client', c.devices || [], id)}` : '';
+  const code = p && !S.mode ? `<p class=mu>Client code <b>${esc(c.code)}</b> · ${(c.devices || []).length} of 4 devices</p><div class=cb><button type=button onclick="shareCode('${esc(c.code)}')">Share code</button><button type=button class="${S.rc ? 'cf' : ''}" onclick="reissueCode('${id}')">${S.rc ? 'confirm reissue' : 'reissue code'}</button></div>${S.rc ? '<p class=mu>This signs the client phones out and makes a new code. The cattle stay.</p>' : ''}${deviceCard('client', c.devices || [], id)}` : '';
   const waiting = p && !S.mode && parkedFor(id) ? parkNote() : '';
   let body;
   if (S.mode === 'weigh' && p) body = weighV(id);
