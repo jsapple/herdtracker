@@ -4,6 +4,8 @@ const { db, json, verifyProducer } = require('./lib/db');
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
   const { producerId, deviceId } = JSON.parse(event.body || '{}');
+  const { data: gate } = await db.from('producers').select('status').eq('id', producerId).maybeSingle();
+  if (gate && gate.status !== 'active') return json(403, { error: 'This account is paused.' });
   if (!(await verifyProducer(producerId, deviceId))) return json(403, { error: 'Not signed in' });
 
   const { data: producer } = await db.from('producers').select('id, name, status').eq('id', producerId).single();

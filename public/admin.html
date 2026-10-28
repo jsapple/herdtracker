@@ -1,24 +1,109 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Herd Tracker — Owner</title>
-<style>body{font:16px system-ui;max-width:420px;margin:40px auto;padding:0 16px;background:#000;color:#f3efe4}
+<style>
+body{font:16px system-ui;max-width:420px;margin:40px auto;padding:0 16px;background:#000;color:#f3efe4}
 input,button{width:100%;box-sizing:border-box;font:inherit;padding:12px;margin:6px 0;border-radius:10px;border:1px solid #444;background:#141414;color:#f3efe4}
-button{background:#f5b942;color:#000;font-weight:700;border:0}pre{white-space:pre-wrap;background:#141414;padding:12px;border-radius:10px}</style>
+button{background:#f5b942;color:#000;font-weight:700;border:0;cursor:pointer}
+button.plain{background:none;color:#f5b942;border:2px solid #f5b942}
+button.bad{background:none;color:#ff5c5c;border:2px solid #ff5c5c}
+button.bad.on{background:#ff5c5c;color:#000}
+.card{background:#141414;border:1px solid #333;border-radius:14px;padding:14px;margin:12px 0}
+.card b{display:block;font-size:18px}
+.mu{color:#c2bba9;margin:4px 0 10px}
+.row{display:flex;gap:8px}
+.row button{flex:1}
+pre{white-space:pre-wrap;background:#141414;padding:12px;border-radius:10px}
+[hidden]{display:none}
+</style>
 </head><body>
+<div id="main">
 <h2>New producer</h2>
 <input id=secret type=password placeholder="Admin secret">
 <input id=name placeholder="Producer / business name">
 <input id=email type=email placeholder="Producer's email">
-<button type="button" onclick="go()">Create account</button>
+<button type="button" onclick="createAccount()">Create account</button>
 <pre id=out></pre>
+<h2>Accounts</h2>
+<button type="button" class="plain" onclick="loadList()">Show accounts</button>
+<div id="list"></div>
+</div>
+<div id="ask" hidden>
+<h2 id="asktitle"></h2>
+<p>This deletes the producer, their cattle, and their weights. It cannot be undone.</p>
+<button type="button" class="plain" onclick="cancelDelete()">Cancel</button>
+<button type="button" class="bad on" onclick="confirmDelete()">Delete account</button>
+<pre id="askout"></pre>
+</div>
 <script>
 function field(id){ return document.getElementById(id).value.trim(); }
-async function go(){
- const body = { secret: field('secret'), name: field('name'), email: field('email') };
- if (!body.name || !body.email) { out.textContent = 'Enter the producer name and email.'; return; }
- const r=await fetch('/.netlify/functions/create-producer',{method:'POST',headers:{'content-type':'application/json'},
-  body:JSON.stringify(body)});
- const d=await r.json();
- out.textContent=r.ok?('Created. Producer code to email them:\n\n'+d.producer.code):('Error: '+d.error);
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return '&#' + c.charCodeAt(0) + ';'; }); }
+let pending = null;
+
+async function post(path, body){
+  const r = await fetch('/.netlify/functions/' + path, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body) });
+  const d = await r.json().catch(function(){ return {}; });
+  return { ok:r.ok, d:d };
+}
+
+async function createAccount(){
+  const body = { secret: field('secret'), name: field('name'), email: field('email') };
+  if (!body.name || !body.email) { out.textContent = 'Enter the producer name and email.'; return; }
+  const { ok, d } = await post('create-producer', body);
+  out.textContent = ok ? ('Created. Producer code to email them:\n\n' + d.producer.code) : ('Error: ' + (d.error || 'Could not create producer'));
+  if (ok) loadList();
+}
+
+async function loadList(){
+  const secret = field('secret');
+  if (!secret) { out.textContent = 'Enter the admin secret.'; return; }
+  const { ok, d } = await post('list-producers', { secret: secret });
+  if (!ok) { out.textContent = 'Error: ' + (d.error || 'Could not load accounts'); return; }
+  const list = document.getElementById('list');
+  const rows = d.producers || [];
+  if (!rows.length) { list.innerHTML = '<p class=mu>No producers yet.</p>'; return; }
+  list.innerHTML = rows.map(function(p){
+    const paused = p.status !== 'active';
+    return '<div class=card data-id="' + esc(p.id) + '"><b>' + esc(p.name) + '</b><p class=mu>' + esc(p.email) + (paused ? ' · Paused' : '') + '</p><div class=row><button type=button class=plain data-act="pause">' + (paused ? 'Resume account' : 'Pause account') + '</button><button type=button class=bad data-act="delete">Delete account</button></div></div>';
+  }).join('');
+  rows.forEach(function(p){
+    const card = list.querySelector('[data-id="' + p.id + '"]');
+    if (!card) return;
+    card.querySelector('[data-act="pause"]').onclick = function(){ setPaused(p, p.status === 'active'); };
+    card.querySelector('[data-act="delete"]').onclick = function(){ askDelete(p); };
+  });
+}
+
+async function setPaused(p, pause){
+  const { ok, d } = await post('set-producer-status', { secret: field('secret'), producerId: p.id, status: pause ? 'lapsed' : 'active' });
+  if (!ok) { out.textContent = 'Error: ' + (d.error || 'Could not update the account'); return; }
+  out.textContent = p.name + (pause ? ' is paused. Their cattle stay. They cannot sign in.' : ' is active again.');
+  loadList();
+}
+
+function askDelete(p){
+  pending = p;
+  document.getElementById('asktitle').textContent = 'Delete ' + p.name + '?';
+  document.getElementById('askout').textContent = '';
+  document.getElementById('main').hidden = true;
+  document.getElementById('ask').hidden = false;
+}
+
+function cancelDelete(){
+  pending = null;
+  document.getElementById('ask').hidden = true;
+  document.getElementById('main').hidden = false;
+}
+
+async function confirmDelete(){
+  if (!pending) return;
+  const name = pending.name;
+  const { ok, d } = await post('delete-producer', { secret: field('secret'), producerId: pending.id });
+  if (!ok) { document.getElementById('askout').textContent = 'Error: ' + (d.error || 'Could not delete the account'); return; }
+  pending = null;
+  document.getElementById('ask').hidden = true;
+  document.getElementById('main').hidden = false;
+  out.textContent = name + ' is deleted.';
+  loadList();
 }
 </script></body></html>

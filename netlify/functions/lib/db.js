@@ -28,8 +28,19 @@ module.exports = { db, json, makeCode };
 // that request touch anything. Every producer-scoped function calls this
 // first — a request can't just claim a producerId, it has to prove it with
 // a device that was actually linked by producer-login.
+function adminOk(secret) {
+  return !!(process.env.ADMIN_SECRET && secret === process.env.ADMIN_SECRET);
+}
+module.exports.adminOk = adminOk;
+
 async function verifyProducer(producerId, deviceId) {
   if (!producerId || !deviceId) return false;
+  const { data: producer } = await db
+    .from('producers')
+    .select('status')
+    .eq('id', producerId)
+    .maybeSingle();
+  if (!producer || producer.status !== 'active') return false;
   const { data } = await db
     .from('producer_devices')
     .select('device_id')

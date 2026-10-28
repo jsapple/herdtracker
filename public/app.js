@@ -140,13 +140,14 @@ ${pageTools('producer')}`;
 
 function finishBlock(s) {
   if (s.wt == null) return '';
-  if (s.atTarget) return '<div class="fin ok">At target</div>';
-  if (s.finish) return `<div class=fin>${fmt(s.finish, false)}<small>${s.days} days · ${s.toGo} lb to go</small></div>`;
-  if (s.estimateNote === 'low') return `<p class=mu>Gain is too low to estimate a date.</p><p class=mu>${s.toGo} lb to go</p>`;
-  return `<p class=mu>Weigh again to estimate a date.</p><p class=mu>${s.toGo} lb to go</p>`;
+  const days = s.days === 1 ? '1 day' : s.days + ' days';
+  if (s.atTarget) return '<div class="fin ok">On Target</div>';
+  if (s.finish) return `<div class=fin>${s.toGo} lb left · ${days}<small>estimated on ${fmt(s.finish, false)}</small></div>`;
+  if (s.estimateNote === 'low') return `<div class=fin>${s.toGo} lb left<small>gain too low to date</small></div>`;
+  return `<div class=fin>${s.toGo} lb left<small>weigh again to date</small></div>`;
 }
 function targetControls(a) {
-  return `<div class=tg><input inputmode=numeric value="${a.targetLb}" onchange="setTargetInput('${a.id}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" aria-label="Target weight in pounds"><span>target lb</span></div>`;
+  return `<div class=tg><input inputmode=numeric value="${a.targetLb}" onchange="setTargetInput('${a.id}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" aria-label="Target weight in pounds"></div>`;
 }
 function animalV(a, g, selecting) {
   const s = st(a);
@@ -155,12 +156,11 @@ function animalV(a, g, selecting) {
   const slow = g.slower.includes(a.id);
   return `<div class=an data-tag="${attr(a.tag)}" data-id="${a.id}"${selecting ? ` onclick="toggleSel('${a.id}')"` : ''}>
 <div class=l1><b>${selecting ? `<span class="ck${on ? ' on' : ''}"></span>` : ''}${esc(a.tag)}</b><b>${s.wt == null ? '—' : s.wt + ' lb'}</b></div>
-${s.date ? `<p class=mu style="margin:4px 0">weight on ${fmt(s.date)} · ${ago(s.since)}</p>` : '<p class=mu style="margin:4px 0">No weight yet</p>'}
+${s.date ? `<p class="mu above">weight on ${fmt(s.date)} · ${ago(s.since)}</p>` : '<p class="mu above">No weight yet</p>'}
 <div class="pb${s.atTarget ? ' ok' : ''}"><i style="width:${pct.toFixed(0)}%"></i></div>
-${selecting ? '' : targetControls(a)}
-${finishBlock(s)}
-${slow ? '<div class=wa>gaining slower than this group</div>' : ''}
-${selecting ? '' : `<button type=button class=mini style="margin-top:8px" onclick="openHist('${a.id}')">Weights</button>`}
+${selecting ? finishBlock(s) : `<div class=aim>${targetControls(a)}${finishBlock(s)}</div>`}
+${slow ? '<p class=slow>gaining slower than this group</p>' : ''}
+${selecting ? '' : `<div class=past><button type=button class=mini onclick="openHist('${a.id}')">Past Weights</button></div>`}
 </div>`;
 }
 
@@ -192,7 +192,7 @@ function shipV(clientId, p) {
       const x = inf(a);
       const line = x ? `In ${x.i} → Out ${a.shipLb} lb` : 'No in-weight';
       const side = x ? `+${x.g} lb<br><small>${x.adg.toFixed(2)}/day · ${x.dy} days</small>` : '';
-      return `<div class=row><div>${esc(a.tag)}<br><span class=mu>${line}</span></div><div class=rt>${side}${p ? `<br><button type=button class="sm${S.ra === a.id ? ' cfm' : ''}" onclick="reactivate('${a.id}')">${S.ra === a.id ? 'Confirm reactivate' : 'Reactivate'}</button>` : ''}<br><button type=button class=mini onclick="openHist('${a.id}')">Weights</button></div></div>`;
+      return `<div class=row><div>${esc(a.tag)}<br><span class=mu>${line}</span></div><div class=rt>${side}${p ? `<br><button type=button class="sm${S.ra === a.id ? ' cfm' : ''}" onclick="reactivate('${a.id}')">${S.ra === a.id ? 'Confirm reactivate' : 'Reactivate'}</button>` : ''}<br><button type=button class=mini onclick="openHist('${a.id}')">Past Weights</button></div></div>`;
     }).join('');
   }).join('')}</details>`;
 }
@@ -201,7 +201,7 @@ function clientMain(id, g, p) {
   const selecting = S.mode === 'sel';
   const animals = activeOf(id).slice().sort(gainSort);
   const actions = p && !selecting
-    ? `<div class=act><button type=button class=weigh onclick="startWeigh()">Weigh</button>${!S.mode && animals.length ? '<button type=button class=ship onclick="startShip()">Ship</button>' : ''}</div>`
+    ? `<div class=act>${!S.mode && animals.length ? '<button type=button class=ship onclick="startShip()">Ship</button>' : ''}<button type=button class=weigh onclick="startWeigh()">Weigh</button></div>`
     : '';
   return `${band(g.head, g.avg, g.adg)}
 ${typicalV(g)}
@@ -235,15 +235,12 @@ function weighV(clientId) {
   return `<button type=button class=lk onclick="backToList()">‹ Back</button>
 <div class=card><div class=hd>Weigh date</div>
 <input type=date id=wd value="${date}" onchange="setWeighDate(this.value)">
-<p class=mu>Filled in as today on this phone or computer. Change it to enter an earlier weigh-in.</p>
 ${waiting}
-<input id=wq inputmode=numeric placeholder="Find a tag" value="${attr(S.wq || '')}" autocomplete=off aria-label="Find a tag" oninput="filterWeigh(this.value)">
 ${rows}
 <div class="sb sit"><button type=button class=sm onclick="backToList()">Back</button><button type=button class=bt2 id=savew onclick="saveWeigh('${clientId}')">Save weights</button></div>
 </div>
 <div class=card><div class=hd>Add a tag</div>
-<p class=mu>Type the new tag number and save it. Enter the weight next to that tag in the list above.</p>
-<input id=newtag inputmode=numeric enterkeyhint=done placeholder="Tag" autocomplete=off aria-label="New tag" onkeydown="if(event.key==='Enter'){event.preventDefault();saveTag('${clientId}')}">
+<input id=newtag inputmode=numeric enterkeyhint=done placeholder="input tag number" autocomplete=off aria-label="New tag" onkeydown="if(event.key==='Enter'){event.preventDefault();saveTag('${clientId}')}">
 <button type=button class=sm2 style="width:100%" onclick="saveTag('${clientId}')">Save tag</button>
 </div>`;
 }
@@ -259,7 +256,7 @@ function histV(id) {
     return `<div class=row data-prev="${date}" style="flex-wrap:wrap"><div class=pair style="flex:1"><input type=date class=hdte value="${date}" aria-label="Weigh date for ${attr(a.tag)}"><input class=hwt inputmode=numeric value="${weight}" aria-label="Pounds" style="flex:none;width:110px"></div><button type=button class=mini onclick="saveHistRow('${a.id}', this)">Save</button><button type=button class="mini bad" onclick="deleteWeigh('${a.id}','${date}')">${S.del === key ? 'Confirm remove' : 'Remove'}</button></div>`;
   }).join('') || '<p class=mu>No weights yet.</p>';
   const edit = p ? `<div class=hd style="margin-top:16px">Tag</div><div class=pair><input id=tagname inputmode=numeric value="${attr(a.tag)}" aria-label="Tag"><button type=button class=mini onclick="renameAnimal('${a.id}')">Save tag</button></div><div class=hd style="margin-top:16px">Add a weigh-in</div><p class=mu>Pick the date this weight was taken. Change it for an earlier weigh-in. A date after this animal shipped starts a new animal and leaves this record as history.</p><div class=pair><input type=date id=ad value="${today()}" aria-label="Date for the new weigh-in"><input id=aw inputmode=numeric placeholder="lb" aria-label="Pounds" style="flex:none;width:110px"></div><button type=button class=bt onclick="addHistWeigh('${a.id}')">Add weigh-in</button><button type=button class="mini bad" style="margin-top:16px" onclick="deleteAnimal('${a.id}')">${S.del === 'a:' + a.id ? 'Confirm remove animal' : 'Remove animal'}</button>` : '';
-  return `<button type=button class=lk onclick="backToList()">‹ Back</button><h2>${esc(a.tag)}</h2><div class=card><div class=hd>Weights</div>${rows}${edit}</div>`;
+  return `<button type=button class=lk onclick="backToList()">‹ Back</button><h2>${esc(a.tag)}</h2><div class=card><div class=hd>Past Weights</div>${rows}${edit}</div>`;
 }
 
 function confV(id) {
@@ -844,9 +841,9 @@ function openHow(kind) {
     'Remove client is at the bottom of that page. Tap it, then tap again to confirm. That deletes the client, their cattle, and every weight. It cannot be undone.',
     'Reissue code makes a new 6-character code and signs the client phones out. The cattle stay.',
     'Tap Weigh. The date is today on this phone. Change it when you are entering an older weigh-in. Use whole pounds. Decimals are not accepted.',
-    'Tags already in the herd are listed as numbers only. Type the pounds next to the tag. Find a tag jumps to a number. Next on the keyboard moves to the next empty animal.',
+    'Tags already in the herd are listed as numbers only. Type the pounds next to the tag. Next on the keyboard moves to the next empty animal.',
     'A brand-new tag goes under Add a tag. Save the number only. Then enter its weight next to that tag in the list.',
-    'The target lb on each animal is shared with the client. Either of you can change it. The other phone shows the new number the next time the app is opened.',
+    'The target number under each animal is shared with the client. Either of you can change it. The other phone shows the new number the next time the app is opened. Beside that number the card says On Target, the estimated date, or why a date is not ready. It also says when an animal is gaining slower than this group.',
     'If the signal drops, weights and new tags stay on this phone and send when you have service again.',
     'Ship from the list when cattle leave. Reactivate only if that ship was marked by mistake.',
     'A shipped tag can be used again. That starts a new animal. The old weights stay on the shipped record.',
@@ -855,9 +852,9 @@ function openHow(kind) {
     'Sign in once with the 6-character code from your producer. It stays signed in on this phone.',
     'On an iPhone, tap Share, then Add to Home Screen, so it opens like an app in the truck or at the lot.',
     'The top of the page shows head, pounds per day, and average pounds. Under that are typical, earliest, and latest. Those dates are for cattle still short of their target.',
-    'Each tag shows the latest weight and a date for reaching the target. That date appears after the second weigh-in. A very small daily gain does not get a date.',
-    'Find a tag to jump to one animal. Weights shows every weigh-in for that tag.',
-    'The number marked target lb is shared with your producer. Either of you can change it. Open the app again to see a change made on the other phone.',
+    'Each tag shows the latest weight. Beside the target it says On Target, an estimated date, gain too low to date, or weigh again to date. It also says when an animal is gaining slower than this group.',
+    'Find a tag to jump to one animal. Past Weights shows every weigh-in for that tag.',
+    'The target number under each animal is shared with your producer. Either of you can change it. Open the app again to see a change made on the other phone.',
     'Shipped cattle stay in the list below, with their own history. Those weights are not mixed into the cattle still on feed.',
     'Download CSV or Print at the bottom of this page to keep a copy.'
   ];
@@ -881,15 +878,14 @@ function fileName(name) {
 }
 function rowsFor(list) {
   const rows = [];
-  list.slice().sort(tagSort).forEach((a) => {
+  const animals = list.slice().sort(tagSort);
+  animals.forEach((a, i) => {
     const w = (a.weighins || []).slice().sort((x, y) => String(x[0]).localeCompare(String(y[0])));
-    if (!w.length) {
-      rows.push([a.tag, a.status, '', '', a.targetLb, a.shipDate || '', a.shipLb == null ? '' : a.shipLb]);
-      return;
-    }
-    w.forEach(([d, lb]) => {
+    if (!w.length) rows.push([a.tag, a.status, '', '', a.targetLb, a.shipDate || '', a.shipLb == null ? '' : a.shipLb]);
+    else w.forEach(([d, lb]) => {
       rows.push([a.tag, a.status, d, lb, a.targetLb, a.shipDate || '', a.shipLb == null ? '' : a.shipLb]);
     });
+    if (i < animals.length - 1) rows.push([]);
   });
   return rows;
 }
@@ -1002,7 +998,11 @@ if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
       clients: [{ id: 'c1', name: 'Hartley Ranch', code: 'ABC123', devicesLinked: 1, devices: [{ deviceId: 'client-phone', linkedAt: '2026-08-15T18:00:00Z' }] }],
       animals: [
         { id: 'a1', clientId: 'c1', tag: '12', targetLb: 1500, status: 'active', weighins: [['2026-09-01', 1100], ['2026-10-01', 1250]] },
-        { id: 'a2', clientId: 'c1', tag: '4', targetLb: 1500, status: 'active', weighins: [] }
+        { id: 'a2', clientId: 'c1', tag: '4', targetLb: 1500, status: 'active', weighins: [] },
+        { id: 'a3', clientId: 'c1', tag: '2', targetLb: 1500, status: 'active', weighins: [['2026-09-01', 1400], ['2026-10-01', 1550]] },
+        { id: 'a4', clientId: 'c1', tag: '7', targetLb: 1500, status: 'active', weighins: [['2026-09-01', 900], ['2026-10-01', 960]] },
+        { id: 'a5', clientId: 'c1', tag: '5', targetLb: 1500, status: 'active', weighins: [['2026-09-01', 1000], ['2026-10-01', 1005]] },
+        { id: 'a6', clientId: 'c1', tag: '9', targetLb: 1500, status: 'active', weighins: [['2026-10-01', 1100]] }
       ]
     };
     S.skipCapture = true;

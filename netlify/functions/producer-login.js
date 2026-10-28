@@ -14,6 +14,7 @@ exports.handler = async (event) => {
     .maybeSingle();
 
   if (!producer) return json(404, { error: 'Code not found' });
+  if (producer.status !== 'active') return json(403, { error: 'This account is paused.' });
 
   const { data: devices } = await db
     .from('producer_devices')
