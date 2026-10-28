@@ -1,7 +1,7 @@
 // Minimal offline shell cache. Data always comes fresh from the network;
 // this only keeps the app itself loading if the signal drops briefly.
-const CACHE = 'herd-tracker-v32';
-const SHELL = ['/', '/index.html', '/stats.js', '/app.js', '/manifest.json'];
+const CACHE = 'herd-tracker-v34';
+const SHELL = ['/', '/index.html', '/stats.js', '/app.js', '/manifest.json', '/icon-192.png', '/icon-512.png', '/icon-maskable-192.png', '/icon-maskable-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));

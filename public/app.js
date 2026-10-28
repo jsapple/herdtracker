@@ -124,10 +124,9 @@ function prodV() {
   const head = allActive().length;
   const list = clients.length ? `<div class=card>${clients.map((c) => {
     const g = grp(activeOf(c.id));
-    const avg = g.avg == null ? '—' : Math.round(g.avg);
     const adg = g.adg == null ? '—' : g.adg.toFixed(2);
     const slow = g.slower.length ? `<br><span class=wa>${g.slower.length} gaining slower</span>` : '';
-    return `<div class="row go" onclick="openClient('${c.id}')"><div><b>${esc(c.name)}</b><br><span class=mu>${g.head} head · ${avg} lb</span></div><div class=rt>${adg} <small>lb/day</small>${slow}</div></div>`;
+    return `<div class="row go" onclick="openClient('${c.id}')"><div><b>${esc(c.name)}</b></div><div class=rt>${adg} <small>lb/day</small>${slow}</div></div>`;
   }).join('')}</div>` : '<div class=card><p class=mu>Add a client, then enter weights.</p></div>';
   return `<h2>All clients</h2>
 ${parkNote()}
@@ -247,7 +246,7 @@ ${rows}
 
 function histV(id) {
   const a = animalById(id);
-  if (!a) return '<button type=button class=lk onclick="backToList()">‹ Back</button><p class=mu>That animal is gone.</p>';
+  if (!a) return '<button type=button class=back onclick="backToList()">‹ Back</button><p class=mu>That animal is gone.</p>';
   const p = S.role === 'producer';
   const w = (a.weighins || []).slice().sort((x, y) => x[0].localeCompare(y[0]));
   const rows = w.map(([date, weight]) => {
@@ -256,7 +255,7 @@ function histV(id) {
     return `<div class=row data-prev="${date}" style="flex-wrap:wrap"><div class=pair style="flex:1"><input type=date class=hdte value="${date}" aria-label="Weigh date for ${attr(a.tag)}"><input class=hwt inputmode=numeric value="${weight}" aria-label="Pounds" style="flex:none;width:110px"></div><button type=button class=mini onclick="saveHistRow('${a.id}', this)">Save</button><button type=button class="mini bad" onclick="deleteWeigh('${a.id}','${date}')">${S.del === key ? 'Confirm remove' : 'Remove'}</button></div>`;
   }).join('') || '<p class=mu>No weights yet.</p>';
   const edit = p ? `<div class=hd style="margin-top:16px">Tag</div><div class=pair><input id=tagname inputmode=numeric value="${attr(a.tag)}" aria-label="Tag"><button type=button class=mini onclick="renameAnimal('${a.id}')">Save tag</button></div><div class=hd style="margin-top:16px">Add a weigh-in</div><p class=mu>Pick the date this weight was taken. Change it for an earlier weigh-in. A date after this animal shipped starts a new animal and leaves this record as history.</p><div class=pair><input type=date id=ad value="${today()}" aria-label="Date for the new weigh-in"><input id=aw inputmode=numeric placeholder="lb" aria-label="Pounds" style="flex:none;width:110px"></div><button type=button class=bt onclick="addHistWeigh('${a.id}')">Add weigh-in</button><button type=button class="mini bad" style="margin-top:16px" onclick="deleteAnimal('${a.id}')">${S.del === 'a:' + a.id ? 'Confirm remove animal' : 'Remove animal'}</button>` : '';
-  return `<button type=button class=lk onclick="backToList()">‹ Back</button><h2>${esc(a.tag)}</h2><div class=card><div class=hd>Past Weights</div>${rows}${edit}</div>`;
+  return `<button type=button class=back onclick="backToList()">‹ Back</button><h2>${esc(a.tag)}</h2><div class=card><div class=hd>Past Weights</div>${rows}${edit}</div>`;
 }
 
 function confV(id) {
@@ -836,7 +835,7 @@ function openHow(kind) {
   if (!box) return;
   const producer = kind === 'producer';
   const steps = producer ? [
-    'Sign in once on this phone with your 8-character code. It stays signed in.',
+    'Sign in once on this phone with your 8-character code. It stays signed in. On an iPhone, tap Share, then Add to Home Screen. On an Android phone, tap the browser menu, then Install app or Add to Home screen.',
     'Add a client at the bottom of your list. The page opens on that client and shows a 6-character code. Share that code. That is how the client sees their cattle.',
     'Remove client is at the bottom of that page. Tap it, then tap again to confirm. That deletes the client, their cattle, and every weight. It cannot be undone.',
     'Reissue code makes a new 6-character code and signs the client phones out. The cattle stay.',
@@ -850,7 +849,7 @@ function openHow(kind) {
     'Download CSV or Print at the bottom of the page. The file and the paper copy are the record for you or the client.'
   ] : [
     'Sign in once with the 6-character code from your producer. It stays signed in on this phone.',
-    'On an iPhone, tap Share, then Add to Home Screen, so it opens like an app in the truck or at the lot.',
+    'On an iPhone, tap Share, then Add to Home Screen. On an Android phone, tap the browser menu, then Install app or Add to Home screen.',
     'The top of the page shows head, pounds per day, and average pounds. Under that are typical, earliest, and latest. Those dates are for cattle still short of their target.',
     'Each tag shows the latest weight. Beside the target it says On Target, an estimated date, gain too low to date, or weigh again to date. It also says when an animal is gaining slower than this group.',
     'Find a tag to jump to one animal. Past Weights shows every weigh-in for that tag.',
@@ -881,16 +880,17 @@ function rowsFor(list) {
   const animals = list.slice().sort(tagSort);
   animals.forEach((a, i) => {
     const w = (a.weighins || []).slice().sort((x, y) => String(x[0]).localeCompare(String(y[0])));
-    if (!w.length) rows.push([a.tag, a.status, '', '', a.targetLb, a.shipDate || '', a.shipLb == null ? '' : a.shipLb]);
+    const shipLb = a.shipLb == null ? '' : a.shipLb;
+    if (!w.length) rows.push([a.tag, a.status, '', '', a.targetLb, a.shipDate || '', shipLb, '']);
     else w.forEach(([d, lb]) => {
-      rows.push([a.tag, a.status, d, lb, a.targetLb, a.shipDate || '', a.shipLb == null ? '' : a.shipLb]);
+      rows.push([a.tag, a.status, d, lb, a.targetLb, a.shipDate || '', shipLb, '']);
     });
     if (i < animals.length - 1) rows.push([]);
   });
   return rows;
 }
 function csvText(sections) {
-  const header = ['Tag', 'Status', 'Weigh date', 'Weight lb', 'Target lb', 'Ship date', 'Ship weight lb'];
+  const header = ['Tag', 'Status', 'Weigh date', 'Weight lb', 'Target lb', 'Ship date', 'Ship weight lb', 'Notes'];
   const lines = [];
   sections.forEach((section, i) => {
     if (i) lines.push('');
