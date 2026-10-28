@@ -231,7 +231,8 @@ function weighV(clientId) {
     return `<div class="row wrow" data-tag="${attr(a.tag)}"${hide ? ' hidden' : ''}><div class=wtag>${esc(a.tag)}</div><input data-wid="${a.id}" inputmode=numeric enterkeyhint=next autocomplete=off placeholder="lb" aria-label="Weight in pounds for ${attr(a.tag)}" value="${attr(val)}" oninput="S.draft[this.dataset.wid]=this.value;parkWeigh()" onkeydown="if(event.key==='Enter'){event.preventDefault();nextEmpty(this)}"></div>`;
   }).join('') || '<p class=mu>No animals yet. Add a tag below.</p>';
   const waiting = parkedFor(clientId) ? '<p class=mu>Saved on this phone, waiting for signal.</p>' : '';
-  return `<button type=button class=lk onclick="backToList()">‹ Back</button>
+  const back = '<button type=button class=lk onclick="backToList()">‹ Back</button>';
+  return `${back}
 <div class=card><div class=hd>Weigh date</div>
 <input type=date id=wd value="${date}" onchange="setWeighDate(this.value)">
 ${waiting}
@@ -241,12 +242,14 @@ ${rows}
 <div class=card><div class=hd>Add a tag</div>
 <input id=newtag inputmode=numeric enterkeyhint=done placeholder="input tag number" autocomplete=off aria-label="New tag" onkeydown="if(event.key==='Enter'){event.preventDefault();saveTag('${clientId}')}">
 <button type=button class=sm2 style="width:100%" onclick="saveTag('${clientId}')">Save tag</button>
-</div>`;
+</div>
+${back}`;
 }
 
 function histV(id) {
   const a = animalById(id);
-  if (!a) return '<button type=button class=back onclick="backToList()">‹ Back</button><p class=mu>That animal is gone.</p>';
+  const back = '<button type=button class=lk onclick="backToList()">‹ Back</button>';
+  if (!a) return back + '<p class=mu>That animal is gone.</p>' + back;
   const p = S.role === 'producer';
   const w = (a.weighins || []).slice().sort((x, y) => x[0].localeCompare(y[0]));
   const rows = w.map(([date, weight]) => {
@@ -255,7 +258,7 @@ function histV(id) {
     return `<div class=row data-prev="${date}" style="flex-wrap:wrap"><div class=pair style="flex:1"><input type=date class=hdte value="${date}" aria-label="Weigh date for ${attr(a.tag)}"><input class=hwt inputmode=numeric value="${weight}" aria-label="Pounds" style="flex:none;width:110px"></div><button type=button class=mini onclick="saveHistRow('${a.id}', this)">Save</button><button type=button class="mini bad" onclick="deleteWeigh('${a.id}','${date}')">${S.del === key ? 'Confirm remove' : 'Remove'}</button></div>`;
   }).join('') || '<p class=mu>No weights yet.</p>';
   const edit = p ? `<div class=hd style="margin-top:16px">Tag</div><div class=pair><input id=tagname inputmode=numeric value="${attr(a.tag)}" aria-label="Tag"><button type=button class=mini onclick="renameAnimal('${a.id}')">Save tag</button></div><div class=hd style="margin-top:16px">Add a weigh-in</div><p class=mu>Pick the date this weight was taken. Change it for an earlier weigh-in. A date after this animal shipped starts a new animal and leaves this record as history.</p><div class=pair><input type=date id=ad value="${today()}" aria-label="Date for the new weigh-in"><input id=aw inputmode=numeric placeholder="lb" aria-label="Pounds" style="flex:none;width:110px"></div><button type=button class=bt onclick="addHistWeigh('${a.id}')">Add weigh-in</button><button type=button class="mini bad" style="margin-top:16px" onclick="deleteAnimal('${a.id}')">${S.del === 'a:' + a.id ? 'Confirm remove animal' : 'Remove animal'}</button>` : '';
-  return `<button type=button class=back onclick="backToList()">‹ Back</button><h2>${esc(a.tag)}</h2><div class=card><div class=hd>Past Weights</div>${rows}${edit}</div>`;
+  return `${back}<h2>${esc(a.tag)}</h2><div class=card><div class=hd>Past Weights</div>${rows}${edit}</div>${back}`;
 }
 
 function confV(id) {
@@ -263,7 +266,7 @@ function confV(id) {
   return `<div class=card><div class=hd>Confirm shipment · ${L.length} head</div><p class="mu" style="margin:0">Ship date</p><input type=date id=sd value="${today()}"><p class=mu>Filled in as today. Change it if the truck left on another day.</p><p class=mu>Ship weight starts at the last weigh-in. Change it if you have a load-out weight.</p>${L.map((a) => {
     const s = st(a);
     return `<div class=row data-id="${a.id}"><div>${esc(a.tag)}</div><input class=sw type=text inputmode=numeric value="${s.wt == null ? '' : s.wt}" aria-label="Ship weight for ${attr(a.tag)}" style="width:120px;margin:0;flex:none;text-align:center"></div>`;
-  }).join('')}<div class=cb style="margin:16px 0 0"><button type=button onclick="S.mode='sel';draw()">Back</button><button type=button class=cf2 onclick="confirmShip('${id}')">Confirm shipment</button></div></div>`;
+  }).join('')}<div class=cb style="margin:16px 0 0"><button type=button onclick="S.mode='sel';draw()">Back</button><button type=button class=cf2 onclick="confirmShip('${id}')">Confirm shipment</button></div></div><button type=button class=lk onclick="S.mode='sel';draw()">‹ Back</button>`;
 }
 
 function clientV(id) {
@@ -280,7 +283,7 @@ function clientV(id) {
   else if (S.mode === 'hist') body = histV(S.hist);
   else if (S.mode === 'conf' && p) body = confV(id);
   else body = clientMain(id, g, p);
-  return crumb + (S.mode === 'hist' ? '' : head) + code + waiting + body;
+  return crumb + (S.mode === 'hist' ? '' : head) + code + waiting + body + crumb;
 }
 
 function draw() {
