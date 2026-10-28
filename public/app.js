@@ -237,7 +237,7 @@ function weighV(clientId) {
 <input type=date id=wd value="${date}" onchange="setWeighDate(this.value)">
 ${waiting}
 ${rows}
-<div class="sb sit"><button type=button class=sm onclick="backToList()">Back</button><button type=button class=bt2 id=savew onclick="saveWeigh('${clientId}')">Save weights</button></div>
+<div class="sb sit"><button type=button class=bt2 id=savew onclick="saveWeigh('${clientId}')">Save weights</button></div>
 </div>
 <div class=card><div class=hd>Add a tag</div>
 <input id=newtag inputmode=numeric enterkeyhint=done placeholder="input tag number" autocomplete=off aria-label="New tag" onkeydown="if(event.key==='Enter'){event.preventDefault();saveTag('${clientId}')}">
@@ -831,7 +831,7 @@ async function renameAnimal(id) {
 function pageTools(kind, clientId) {
   const dl = clientId ? `downloadClient('${clientId}')` : 'downloadAll()';
   const pr = clientId ? `printClient('${clientId}')` : 'printAll()';
-  return `<div class=tools><button type=button onclick="openHow('${kind}')">How this works</button><button type=button onclick="${pr}">Print</button><button type=button onclick="${dl}">Download CSV</button></div>`;
+  return `<div class=tools><button type=button onclick="openHow('${kind}')">user guide</button><button type=button onclick="${pr}">Print</button><button type=button onclick="${dl}">Download</button></div>`;
 }
 function openHow(kind) {
   const box = document.getElementById('how');
@@ -849,7 +849,7 @@ function openHow(kind) {
     'If the signal drops, weights and new tags stay on this phone and send when you have service again.',
     'Ship from the list when cattle leave. Reactivate only if that ship was marked by mistake.',
     'A shipped tag can be used again. That starts a new animal. The old weights stay on the shipped record.',
-    'Download CSV or Print at the bottom of the page. The file and the paper copy are the record for you or the client.'
+    'Download or Print at the bottom of the page. The file and the paper copy are the record for you or the client.'
   ] : [
     'Sign in once with the 6-character code from your producer. It stays signed in on this phone.',
     'On an iPhone, tap Share, then Add to Home Screen. On an Android phone, tap the browser menu, then Install app or Add to Home screen.',
@@ -858,10 +858,10 @@ function openHow(kind) {
     'Find a tag to jump to one animal. Past Weights shows every weigh-in for that tag.',
     'The target number under each animal is shared with your producer. Either of you can change it. Open the app again to see a change made on the other phone.',
     'Shipped cattle stay in the list below, with their own history. Those weights are not mixed into the cattle still on feed.',
-    'Download CSV or Print at the bottom of this page to keep a copy.'
+    'Download or Print at the bottom of this page to keep a copy.'
   ];
   box.hidden = false;
-  box.innerHTML = `<div class=card><div class=hd>${producer ? 'Producer' : 'Client'}: how this works</div><ol>${steps.map((s) => '<li>' + esc(s) + '</li>').join('')}</ol><button type=button class=bt onclick="closeHow()">Close</button></div>`;
+  box.innerHTML = `<div class=card><div class=hd>${producer ? 'Producer' : 'Client'}: user guide</div><ol>${steps.map((s) => '<li>' + esc(s) + '</li>').join('')}</ol><button type=button class=bt onclick="closeHow()">Close</button></div>`;
   box.scrollTop = 0;
 }
 function closeHow() {
@@ -893,7 +893,7 @@ function rowsFor(list) {
   return rows;
 }
 function csvText(sections) {
-  const header = ['Tag', 'Status', 'Weigh date', 'Weight lb', 'Target lb', 'Ship date', 'Ship weight lb', 'Notes'];
+  const header = ['Tag', 'Status', 'Weigh date', 'Weight lb', 'Target lb', 'Ship date', 'Ship weight lb', 'Field Notes'];
   const lines = [];
   sections.forEach((section, i) => {
     if (i) lines.push('');
