@@ -219,7 +219,7 @@ ${typicalV(g)}
 ${actions}
 ${selecting ? '<p class=mu>Tap each animal that went on the truck.</p>' : ''}
 <input id=q inputmode=numeric placeholder="Find a tag" value="${attr(S.q)}" oninput="filterTags(this.value)" autocomplete=off aria-label="Find a tag">
-<div id=herd>${animals.map((a) => animalV(a, g, selecting)).join('') || `<p class=mu>${p ? 'No active animals. Tap Weigh, then Add a tag.' : 'No active animals.'}</p>`}</div>
+<div id=herd>${animals.map((a) => animalV(a, g, selecting)).join('') || `<p class=mu>${p ? 'No active animals. Tap Weigh, then Add a new tag.' : 'No active animals.'}</p>`}</div>
 ${selecting ? `<div class=sb><button type=button class=sm onclick="S.mode=null;S.sel=[];draw()">Cancel</button><button type=button class=bt2 ${S.sel.length ? '' : 'disabled'} onclick="S.mode='conf';draw()">Ship ${S.sel.length}</button></div>` : ''}
 </div>
 ${shipV(id, p)}
@@ -239,7 +239,7 @@ function weighV(clientId) {
     const val = Object.prototype.hasOwnProperty.call(S.draft, a.id) ? S.draft[a.id] : weightOn(a, date);
     const hide = q && String(a.tag).indexOf(q) === -1;
     return `<div class="row wrow" data-tag="${attr(a.tag)}"${hide ? ' hidden' : ''}><div class=wtag>${esc(a.tag)}</div><input data-wid="${a.id}" inputmode=numeric enterkeyhint=next autocomplete=off placeholder="lb" aria-label="Weight in pounds for ${attr(a.tag)}" value="${attr(val)}" oninput="S.draft[this.dataset.wid]=this.value;parkWeigh()" onkeydown="if(event.key==='Enter'){event.preventDefault();nextEmpty(this)}"></div>`;
-  }).join('') || '<p class=mu>No animals yet. Add a tag below.</p>';
+  }).join('') || '<p class=mu>No animals yet. Add a new tag below.</p>';
   const waiting = parkedFor(clientId) ? '<p class=mu>Saved on this phone, waiting for signal.</p>' : '';
   const back = '<button type=button class=lk onclick="backToList()">‹ Back</button>';
   return `${back}
@@ -249,7 +249,7 @@ ${waiting}
 ${rows}
 <div class="sb sit"><button type=button class=bt2 id=savew onclick="saveWeigh('${clientId}')">Save weights</button></div>
 </div>
-<div class=card><div class=hd>Add a tag</div>
+<div class=card><div class=hd>Add a new tag</div>
 <input id=newtag inputmode=numeric enterkeyhint=done placeholder="input tag number" autocomplete=off aria-label="New tag" onkeydown="if(event.key==='Enter'){event.preventDefault();saveTag('${clientId}')}">
 <button type=button class=sm2 style="width:100%" onclick="saveTag('${clientId}')">Save tag</button>
 </div>
@@ -268,7 +268,7 @@ function histV(id) {
     const key = 'w:' + a.id + ':' + date;
     return `<div class=row data-prev="${date}" style="flex-wrap:wrap"><div class=pair style="flex:1"><input type=date class=hdte value="${date}" aria-label="Weigh date for ${attr(a.tag)}"><input class=hwt inputmode=numeric value="${weight}" aria-label="Pounds" style="flex:none;width:110px"></div><input class=hnote maxlength=200 placeholder="add field notes" aria-label="Note for this day" value="${attr(text)}"><button type=button class="mini bad hist-act" onclick="deleteWeigh('${a.id}','${date}')">${S.del === key ? 'Confirm remove' : 'Remove'}</button><button type=button class="mini hist-act" onclick="saveHistRow('${a.id}', this)">Save</button></div>`;
   }).join('') || '<p class=mu>No weights yet.</p>';
-  const edit = p ? `<div class=hd style="margin-top:16px">Tag</div><div class=pair><input id=tagname inputmode=numeric value="${attr(a.tag)}" aria-label="Tag"><button type=button class=mini onclick="renameAnimal('${a.id}')">Save tag</button></div><div class=hd style="margin-top:16px">Add a weigh-in</div><p class=mu>Pick the date this weight was taken. Change it for an earlier weigh-in. A date after this animal shipped starts a new animal and leaves this record as history.</p><div class=pair><input type=date id=ad value="${today()}" aria-label="Date for the new weigh-in"><input id=aw inputmode=numeric placeholder="lb" aria-label="Pounds" style="flex:none;width:110px"></div><button type=button class=bt onclick="addHistWeigh('${a.id}')">Add weigh-in</button><button type=button class="mini bad" style="margin-top:16px" onclick="deleteAnimal('${a.id}')">${S.del === 'a:' + a.id ? 'Confirm remove animal' : 'Remove animal'}</button>` : '';
+  const edit = p ? `<div class=hd style="margin-top:16px">Change Tag</div><p class=mu>Type a new number if this tag was entered wrong. The weights stay on this animal.</p><div class=pair><input id=tagname inputmode=numeric value="${attr(a.tag)}" aria-label="Tag"><button type=button class=mini onclick="renameAnimal('${a.id}')">Save tag</button></div><div class=hd style="margin-top:16px">Add a weigh-in</div><p class=mu>Pick the date this weight was taken. Change it for an earlier weigh-in. A date after this animal shipped starts a new animal and leaves this record as history.</p><div class=pair><input type=date id=ad value="${today()}" aria-label="Date for the new weigh-in"><input id=aw inputmode=numeric placeholder="lb" aria-label="Pounds" style="flex:none;width:110px"></div><button type=button class=bt onclick="addHistWeigh('${a.id}')">Add weigh-in</button><button type=button class="mini bad" style="margin-top:16px" onclick="deleteAnimal('${a.id}')">${S.del === 'a:' + a.id ? 'Confirm remove animal' : 'Remove animal'}</button>` : '';
   return `${back}<h2>${esc(a.tag)}</h2><div class=card><div class=hd>Past Weights</div>${rows}${edit}</div>${back}`;
 }
 
@@ -324,6 +324,7 @@ function filterTags(v) {
 async function login() {
   if (S.fails >= 5) return msg('Too many tries. Wait and try again, or ask for a new code.');
   const code = $('#code').value.trim().toUpperCase();
+  if (!code) return msg('Code not found');
   if (code.length === 8) { stayAwake(true); return producerLogin(code); }
   if (code.length === 6) return clientLogin(code);
   msg('Enter the 6-character client code or the 8-character producer code.');
@@ -855,7 +856,7 @@ function openHow(kind) {
     'Reissue code makes a new 6-character code and signs the client phones out. The cattle stay.',
     'Tap Weigh. The date is today on this phone. Change it when you are entering an older weigh-in. Use whole pounds. Decimals are not accepted.',
     'Tags already in the herd are listed as numbers only. Type the pounds next to the tag. Next on the keyboard moves to the next empty animal.',
-    'A brand-new tag goes under Add a tag. Save the number only. Then enter its weight next to that tag in the list.',
+    'A brand-new tag goes under Add a new tag. Save the number only. Then enter its weight next to that tag in the list.',
     'The target number under each animal is shared with the client. Either of you can change it. The other phone shows the new number the next time the app is opened. Beside that number the card says On Target, the estimated date, or why a date is not ready. It also says when an animal is gaining slower than this group.',
     'If the signal drops, weights and new tags stay on this phone and send when you have service again.',
     'Ship from the list when cattle leave. Reactivate only if that ship was marked by mistake.',
