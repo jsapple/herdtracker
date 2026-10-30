@@ -18,7 +18,7 @@ exports.handler = async (event) => {
 
   const { data: animals } = await db
     .from('animals')
-    .select('id, client_id, tag, target_lb, status, ship_date, ship_lb, weighins(weigh_date, weight_lb)')
+    .select('id, client_id, tag, target_lb, status, ship_date, ship_lb, weighins(weigh_date, weight_lb, notes)')
     .eq('producer_id', producerId);
 
   const { data: review } = await db
@@ -27,7 +27,7 @@ exports.handler = async (event) => {
   const shapedAnimals = (animals || []).map((a) => ({
     id: a.id, clientId: a.client_id, tag: a.tag, targetLb: a.target_lb,
     status: a.status, shipDate: a.ship_date, shipLb: a.ship_lb,
-    weighins: (a.weighins || []).sort((x, y) => x.weigh_date.localeCompare(y.weigh_date)).map((w) => [w.weigh_date, w.weight_lb])
+    weighins: (a.weighins || []).sort((x, y) => x.weigh_date.localeCompare(y.weigh_date)).map((w) => [w.weigh_date, w.weight_lb, w.notes || ''])
   }));
 
   const shapedClients = (clients || []).map((c) => ({

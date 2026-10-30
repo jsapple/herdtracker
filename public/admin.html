@@ -10,6 +10,9 @@ button.bad{background:none;color:#ff5c5c;border:2px solid #ff5c5c}
 button.bad.on{background:#ff5c5c;color:#000}
 .card{background:#141414;border:1px solid #333;border-radius:14px;padding:14px;margin:12px 0}
 .card b{display:block;font-size:18px}
+.who{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.who b{min-width:0}
+.code{flex:none;font-weight:700;letter-spacing:.08em}
 .mu{color:#c2bba9;margin:4px 0 10px}
 .row{display:flex;gap:8px}
 .row button{flex:1}
@@ -64,7 +67,7 @@ async function loadList(){
   if (!rows.length) { list.innerHTML = '<p class=mu>No producers yet.</p>'; return; }
   list.innerHTML = rows.map(function(p){
     const paused = p.status !== 'active';
-    return '<div class=card data-id="' + esc(p.id) + '"><b>' + esc(p.name) + '</b><p class=mu>' + esc(p.email) + (paused ? ' · Paused' : '') + '</p><div class=row><button type=button class=plain data-act="pause">' + (paused ? 'Resume account' : 'Pause account') + '</button><button type=button class=bad data-act="delete">Delete account</button></div></div>';
+    return '<div class=card data-id="' + esc(p.id) + '"><div class=who><b>' + esc(p.name) + '</b><span class=code>' + esc(p.code || '') + '</span></div><p class=mu>' + esc(p.email) + (paused ? ' · Paused' : '') + '</p><div class=row><button type=button class=plain data-act="pause">' + (paused ? 'Resume account' : 'Pause account') + '</button><button type=button class=bad data-act="delete">Delete account</button></div></div>';
   }).join('');
   rows.forEach(function(p){
     const card = list.querySelector('[data-id="' + p.id + '"]');

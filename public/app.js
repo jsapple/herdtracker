@@ -105,11 +105,10 @@ function clientsSorted() {
 // ───────────────────────────── views ─────────────────────────────
 
 const loginV = () => `
-<div class="card c"><h2>Sign in</h2>
-<p class=mu>Enter the code you were sent. A client code is 6 characters. A producer code is 8.</p>
+<div class="card c"><h2 class=signin>Sign in</h2>
+<p class=mu>Enter the code you were sent.</p>
 <input id=code maxlength=8 autocomplete=off autocapitalize=characters placeholder="CODE" onkeydown="if(event.key==='Enter')login()">
-<button class=bt onclick="login()">Continue</button>
-<p class=mu>On an iPhone, Share, then Add to Home Screen.</p></div>`;
+<button class=bt onclick="login()">Continue</button></div>`;
 
 function deviceRows(list, scope, clientId) {
   if (!list || !list.length) return '<p class=mu>No devices linked yet.</p>';
@@ -123,7 +122,7 @@ function deviceRows(list, scope, clientId) {
 function deviceCard(scope, list, clientId) {
   const n = (list || []).length;
   const title = scope === 'producer' ? `Your devices · ${n} of 4` : `Client devices · ${n} of 4`;
-  return `<details class=card><summary>${title}</summary>${deviceRows(list, scope, clientId)}<p class=mu>Signing out leaves the device linked. Remove an old phone here.</p></details>`;
+  return `<details class="card devs"><summary>${title}</summary>${deviceRows(list, scope, clientId)}<p class=mu>Signing out leaves the device linked. Remove an old phone here.</p></details>`;
 }
 
 function reviewV() {
@@ -263,10 +262,11 @@ function histV(id) {
   if (!a) return back + '<p class=mu>That animal is gone.</p>' + back;
   const p = S.role === 'producer';
   const w = (a.weighins || []).slice().sort((x, y) => x[0].localeCompare(y[0]));
-  const rows = w.map(([date, weight]) => {
-    if (!p) return `<div class=row><div>${fmt(date)}</div><div class=rt>${weight} lb</div></div>`;
+  const rows = w.map(([date, weight, note]) => {
+    const text = note || '';
+    if (!p) return `<div class=row><div>${fmt(date)}${text ? `<br><span class=mu>${esc(text)}</span>` : ''}</div><div class=rt>${weight} lb</div></div>`;
     const key = 'w:' + a.id + ':' + date;
-    return `<div class=row data-prev="${date}" style="flex-wrap:wrap"><div class=pair style="flex:1"><input type=date class=hdte value="${date}" aria-label="Weigh date for ${attr(a.tag)}"><input class=hwt inputmode=numeric value="${weight}" aria-label="Pounds" style="flex:none;width:110px"></div><button type=button class=mini onclick="saveHistRow('${a.id}', this)">Save</button><button type=button class="mini bad" onclick="deleteWeigh('${a.id}','${date}')">${S.del === key ? 'Confirm remove' : 'Remove'}</button></div>`;
+    return `<div class=row data-prev="${date}" style="flex-wrap:wrap"><div class=pair style="flex:1"><input type=date class=hdte value="${date}" aria-label="Weigh date for ${attr(a.tag)}"><input class=hwt inputmode=numeric value="${weight}" aria-label="Pounds" style="flex:none;width:110px"></div><input class=hnote maxlength=200 placeholder="add field notes" aria-label="Note for this day" value="${attr(text)}"><button type=button class="mini bad hist-act" onclick="deleteWeigh('${a.id}','${date}')">${S.del === key ? 'Confirm remove' : 'Remove'}</button><button type=button class="mini hist-act" onclick="saveHistRow('${a.id}', this)">Save</button></div>`;
   }).join('') || '<p class=mu>No weights yet.</p>';
   const edit = p ? `<div class=hd style="margin-top:16px">Tag</div><div class=pair><input id=tagname inputmode=numeric value="${attr(a.tag)}" aria-label="Tag"><button type=button class=mini onclick="renameAnimal('${a.id}')">Save tag</button></div><div class=hd style="margin-top:16px">Add a weigh-in</div><p class=mu>Pick the date this weight was taken. Change it for an earlier weigh-in. A date after this animal shipped starts a new animal and leaves this record as history.</p><div class=pair><input type=date id=ad value="${today()}" aria-label="Date for the new weigh-in"><input id=aw inputmode=numeric placeholder="lb" aria-label="Pounds" style="flex:none;width:110px"></div><button type=button class=bt onclick="addHistWeigh('${a.id}')">Add weigh-in</button><button type=button class="mini bad" style="margin-top:16px" onclick="deleteAnimal('${a.id}')">${S.del === 'a:' + a.id ? 'Confirm remove animal' : 'Remove animal'}</button>` : '';
   return `${back}<h2>${esc(a.tag)}</h2><div class=card><div class=hd>Past Weights</div>${rows}${edit}</div>${back}`;
@@ -807,7 +807,7 @@ async function sendWeigh(body) {
 }
 function saveHistRow(animalId, btn) {
   const row = btn.closest('[data-prev]');
-  sendWeigh({ animalId, date: row.querySelector('.hdte').value, weight: row.querySelector('.hwt').value, previousDate: row.getAttribute('data-prev') });
+  sendWeigh({ animalId, date: row.querySelector('.hdte').value, weight: row.querySelector('.hwt').value, notes: row.querySelector('.hnote').value, previousDate: row.getAttribute('data-prev') });
 }
 function addHistWeigh(animalId) {
   sendWeigh({ animalId, date: document.getElementById('ad').value, weight: document.getElementById('aw').value });
@@ -860,13 +860,14 @@ function openHow(kind) {
     'If the signal drops, weights and new tags stay on this phone and send when you have service again.',
     'Ship from the list when cattle leave. Reactivate only if that ship was marked by mistake.',
     'A shipped tag can be used again. That starts a new animal. The old weights stay on the shipped record.',
-    'Download or Print at the bottom of the page. The file and the paper copy are the record for you or the client.'
+    'Open Past Weights on a tag to correct that day or add a short note. Save on that row stores the date, the pounds, and the note.',
+    'Download or Print at the bottom of the page. The file and the paper copy are the record for you or the client. A note shows in Field Notes.'
   ] : [
     'Sign in once with the 6-character code from your producer. It stays signed in on this phone.',
     'On an iPhone, tap Share, then Add to Home Screen. On an Android phone, tap the browser menu, then Install app or Add to Home screen.',
     'The top of the page shows head, pounds per day, and average pounds. Under that are typical, earliest, and latest. Those dates are for cattle still short of their target.',
     'Each tag shows the latest weight. Beside the target it says On Target, an estimated date, gain too low to date, or weigh again to date. It also says when an animal is gaining slower than this group.',
-    'Find a tag to jump to one animal. Past Weights shows every weigh-in for that tag.',
+    'Find a tag to jump to one animal. Past Weights shows every weigh-in for that tag, and a note when one was saved.',
     'The target number under each animal is shared with your producer. Either of you can change it. Open the app again to see a change made on the other phone.',
     'Shipped cattle stay in the list below, with their own history. Those weights are not mixed into the cattle still on feed.',
     'Download or Print at the bottom of this page to keep a copy.'
@@ -895,27 +896,27 @@ function rowsFor(list) {
   animals.forEach((a, i) => {
     const w = (a.weighins || []).slice().sort((x, y) => String(x[0]).localeCompare(String(y[0])));
     const shipLb = a.shipLb == null ? '' : a.shipLb;
-    if (!w.length) rows.push([a.tag, a.status, '', '', a.targetLb, a.shipDate || '', shipLb, '']);
-    else w.forEach(([d, lb]) => {
-      rows.push([a.tag, a.status, d, lb, a.targetLb, a.shipDate || '', shipLb, '']);
+    if (!w.length) rows.push([a.tag, a.status, '', '', a.shipDate || '', shipLb, '']);
+    else w.forEach(([d, lb, note]) => {
+      rows.push([a.tag, a.status, d, lb, a.shipDate || '', shipLb, note || '']);
     });
     if (i < animals.length - 1) rows.push([]);
   });
   return rows;
 }
-function csvText(sections) {
-  const header = ['Tag', 'Status', 'Weigh date', 'Weight lb', 'Target lb', 'Ship date', 'Ship weight lb', 'Field Notes'];
+function csvText(sections, showNames) {
+  const header = ['Tag', 'Status', 'Weigh date', 'Weight lb', 'Ship date', 'Ship weight lb', 'Field Notes'];
   const lines = [];
   sections.forEach((section, i) => {
     if (i) lines.push('');
-    lines.push(csvCell(section.title));
+    if (showNames) lines.push(csvCell(section.title));
     lines.push(header.map(csvCell).join(','));
     section.rows.forEach((r) => lines.push(r.map(csvCell).join(',')));
   });
   return lines.join('\r\n');
 }
-function saveCsv(name, sections) {
-  const blob = new Blob(['\uFEFF' + csvText(sections)], { type: 'text/csv;charset=utf-8' });
+function saveCsv(name, sections, showNames) {
+  const blob = new Blob(['\uFEFF' + csvText(sections, showNames)], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
@@ -935,7 +936,7 @@ function downloadAll() {
     title: c.name,
     rows: rowsFor(S.data.animals.filter((a) => a.clientId === c.id))
   }));
-  saveCsv('all-clients-weights.csv', sections);
+  saveCsv('all-clients-weights.csv', sections, true);
 }
 
 function paperDate(iso) {
@@ -946,7 +947,7 @@ function paperDate(iso) {
 function weighHistory(a) {
   const w = (a.weighins || []).slice().sort((x, y) => String(x[0]).localeCompare(String(y[0])));
   if (!w.length) return '<p>No weights recorded.</p>';
-  return '<ul>' + w.map(([d, lb]) => '<li>' + paperDate(d) + ' · ' + lb + ' lb</li>').join('') + '</ul>';
+  return '<ul>' + w.map(([d, lb, note]) => '<li>' + paperDate(d) + ' · ' + lb + ' lb' + (note ? ' · ' + esc(note) : '') + '</li>').join('') + '</ul>';
 }
 function printClient(id) {
   const sheet = document.getElementById('sheet');
@@ -1011,7 +1012,7 @@ if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
       review: [],
       clients: [{ id: 'c1', name: 'Hartley Ranch', code: 'ABC123', devicesLinked: 1, devices: [{ deviceId: 'client-phone', linkedAt: '2026-08-15T18:00:00Z' }] }],
       animals: [
-        { id: 'a1', clientId: 'c1', tag: '12', targetLb: 1500, status: 'active', weighins: [['2026-09-01', 1100], ['2026-10-01', 1250]] },
+        { id: 'a1', clientId: 'c1', tag: '12', targetLb: 1500, status: 'active', weighins: [['2026-09-01', 1100, ''], ['2026-10-01', 1250, 'muddy lot']] },
         { id: 'a2', clientId: 'c1', tag: '4', targetLb: 1500, status: 'active', weighins: [] },
         { id: 'a3', clientId: 'c1', tag: '2', targetLb: 1500, status: 'active', weighins: [['2026-09-01', 1400], ['2026-10-01', 1550]] },
         { id: 'a4', clientId: 'c1', tag: '7', targetLb: 1500, status: 'active', weighins: [['2026-09-01', 900], ['2026-10-01', 960]] },

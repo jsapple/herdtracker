@@ -61,9 +61,12 @@ create table weighins (
   animal_id   uuid not null references animals(id) on delete cascade,
   weigh_date  date not null,
   weight_lb   int  not null,
+  notes       text not null default '',      -- short note for this animal on this day
   created_at  timestamptz not null default now(),
   unique (animal_id, weigh_date)             -- re-uploading the same sheet is a no-op
 );
+-- Existing database: do not re-run this file. Run only this line in the SQL editor:
+-- alter table weighins add column notes text not null default '';
 create index on weighins (animal_id, weigh_date);
 
 -- ─────────────────────── held rows (reused-tag review) ───────────────────────

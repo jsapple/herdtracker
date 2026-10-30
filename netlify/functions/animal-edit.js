@@ -1,4 +1,4 @@
-// POST { producerId, deviceId, animalId, action, confirm?, tag?, date?, weight?, previousDate?, reopen?, newAnimal? }
+// POST { producerId, deviceId, animalId, action, confirm?, tag?, date?, weight?, notes?, previousDate?, reopen?, newAnimal? }
 // action: rename | delete | delete-weigh | save-weigh
 // Clients never call this. Destructive actions require confirm:true.
 const { db, json, verifyProducer, parseIsoDate, parseWeight, parseTag } = require('./lib/db');
@@ -53,8 +53,10 @@ exports.handler = async (event) => {
   if (action === 'save-weigh') {
     const date = parseIsoDate(body.date);
     const weight = parseWeight(body.weight);
+    const notes = String(body.notes == null ? '' : body.notes).replace(/\s+/g, ' ').trim();
     if (!date) return json(400, { error: 'Pick a real date. Future dates are not saved.' });
     if (weight == null) return json(400, { error: 'Enter a whole number of pounds.' });
+    if (notes.length > 200) return json(400, { error: 'Keep the note to 200 characters.' });
     const previousDate = body.previousDate ? parseIsoDate(body.previousDate) : null;
     if (body.previousDate && !previousDate) return json(400, { error: 'Pick a real date. Future dates are not saved.' });
 
@@ -83,7 +85,7 @@ exports.handler = async (event) => {
         .eq('animal_id', targetId).eq('weigh_date', date).maybeSingle();
       if (clash) return json(409, { error: 'This animal already has a weight on that date. Change that one, or remove it first.' });
       const { data: updated, error } = await db.from('weighins')
-        .update({ weigh_date: date, weight_lb: weight })
+        .update({ weigh_date: date, weight_lb: weight, notes })
         .eq('animal_id', targetId).eq('weigh_date', previousDate).select('id');
       if (error || !updated || !updated.length) return json(404, { error: 'That weigh-in was not found.' });
       return json(200, { ok: true });
@@ -93,12 +95,12 @@ exports.handler = async (event) => {
       const { data: clash } = await db.from('weighins').select('id')
         .eq('animal_id', targetId).eq('weigh_date', date).maybeSingle();
       if (clash) return json(409, { error: 'This animal already has a weight on that date. Change that one, or remove it first.' });
-      const { error } = await db.from('weighins').insert({ animal_id: targetId, weigh_date: date, weight_lb: weight });
+      const { error } = await db.from('weighins').insert({ animal_id: targetId, weigh_date: date, weight_lb: weight, notes });
       if (error) return json(500, { error: 'Could not save the weigh-in' });
       return json(200, { ok: true, animalId: targetId });
     }
 
-    const { error } = await db.from('weighins').update({ weight_lb: weight })
+    const { error } = await db.from('weighins').update({ weight_lb: weight, notes })
       .eq('animal_id', targetId).eq('weigh_date', date);
     if (error) return json(500, { error: 'Could not save the weigh-in' });
     return json(200, { ok: true });

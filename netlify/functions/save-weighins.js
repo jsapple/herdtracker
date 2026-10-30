@@ -102,12 +102,14 @@ exports.handler = async (event) => {
   if (!toWrite.length) return json(400, { error: 'Enter at least one weight.' });
 
   const ids = [...new Set(toWrite.map((r) => r.animal_id))];
-  const { data: existing } = await db.from('weighins').select('animal_id, weight_lb')
+  const { data: existing } = await db.from('weighins').select('animal_id, weight_lb, notes')
     .eq('weigh_date', weighDate).in('animal_id', ids);
   const had = {};
-  (existing || []).forEach((w) => { had[w.animal_id] = w.weight_lb; });
+  const priorNote = {};
+  (existing || []).forEach((w) => { had[w.animal_id] = w.weight_lb; priorNote[w.animal_id] = w.notes || ''; });
+  toWrite.forEach((r) => { r.notes = priorNote[r.animal_id] || ''; });
 
-  // ignoreDuplicates stays off so a corrected weight replaces the old one.
+  // ignoreDuplicates stays off so a corrected weight replaces the old one. The note already stored for that day stays.
   const { error } = await db.from('weighins').upsert(toWrite, { onConflict: 'animal_id,weigh_date', ignoreDuplicates: false });
   if (error) return json(500, { error: 'Could not save weigh-ins' });
 

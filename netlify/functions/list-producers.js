@@ -1,4 +1,4 @@
-// POST { secret }  ->  { producers: [{id, name, email, status}] }
+// POST { secret }  ->  { producers: [{id, name, email, code, status}] }
 const { db, json, adminOk } = require('./lib/db');
 
 exports.handler = async (event) => {
@@ -8,7 +8,7 @@ exports.handler = async (event) => {
 
   const { data, error } = await db
     .from('producers')
-    .select('id, name, email, status')
+    .select('id, name, email, code, status')
     .order('name');
   if (error) return json(500, { error: 'Could not load producers' });
   return json(200, { producers: data || [] });
