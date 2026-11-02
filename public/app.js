@@ -10,7 +10,7 @@ const S = {
   mode: null, sel: [], rc: false, rm: false, ra: null, sh: false, busy: false,
   weighDate: null, draft: {}, newRows: [], hist: null,
   q: '', wq: '', del: null, skipCapture: false,
-  tagPick: ['9', '6', '3', '6'], holdPick: false, wheelLock: false
+  tagPick: ['9', '6', '3', '6'], holdPick: false, wheelLock: false, pinTop: false
 };
 
 let mt; const msg = (t) => { $('#msg').textContent = t; clearTimeout(mt); if (t) mt = setTimeout(() => msg(''), 7000); };
@@ -84,8 +84,14 @@ function markWheel(col) {
 }
 function mountWheels() {
   const root = document.getElementById('wheels');
-  if (!root) return;
+  if (!root) {
+    if (S.pinTop) window.scrollTo(0, 0);
+    S.pinTop = false;
+    return;
+  }
   const apply = () => {
+    const x = S.pinTop ? 0 : window.scrollX;
+    const y = S.pinTop ? 0 : window.scrollY;
     const chars = (S.tagPick || TAG_START).slice(0, 4);
     while (chars.length < 4) chars.push('');
     [...root.querySelectorAll('.wheel')].forEach((col, n) => {
@@ -94,13 +100,19 @@ function mountWheels() {
       col.scrollTop = i * 56;
       markWheel(col);
     });
+    window.scrollTo(x, y);
   };
   S.wheelLock = true;
   apply();
   requestAnimationFrame(() => {
-    if (!document.getElementById('wheels')) { S.wheelLock = false; return; }
+    if (!document.getElementById('wheels')) { S.wheelLock = false; S.pinTop = false; return; }
     apply();
-    requestAnimationFrame(() => { S.wheelLock = false; });
+    requestAnimationFrame(() => {
+      S.wheelLock = false;
+      if (!S.pinTop) return;
+      window.scrollTo(0, 0);
+      S.pinTop = false;
+    });
   });
 }
 function wheelBox() {
@@ -252,9 +264,9 @@ function clientMain(id, g, p) {
   const actions = p && !selecting
     ? `<div class=act>${!S.mode && animals.length ? '<button type=button class=ship onclick="startShip()">Ship</button>' : ''}<button type=button class=weigh onclick="startWeigh()">Weigh</button></div>`
     : '';
-  return `${band(g.head, g.avg, g.adg)}
-${typicalV(g)}
-<div class=card><div class="hd c soft">Average Weight Gains</div>${chart(activeOf(id))}</div>
+  return `${selecting ? '' : band(g.head, g.avg, g.adg)}
+${selecting ? '' : typicalV(g)}
+${selecting ? '' : `<div class=card><div class="hd c soft">Average Weight Gains</div>${chart(activeOf(id))}</div>`}
 <div class=card>
 ${actions}
 ${selecting ? '<p class=mu>Tap each animal that went on the truck.</p>' : ''}
@@ -499,13 +511,15 @@ function toggleSel(id) {
   S.sel = S.sel.includes(id) ? S.sel.filter((x) => x !== id) : [...S.sel, id];
   draw();
 }
-function startShip() { S.mode = 'sel'; S.sel = []; S.q = ''; draw(); }
+function startShip() { S.mode = 'sel'; S.sel = []; S.q = ''; draw(); window.scrollTo(0, 0); }
 function openHist(id) {
   const a = animalById(id);
   S.tagPick = tagToWheels(a && a.tag);
   S.holdPick = true;
+  S.pinTop = true;
   S.mode = 'hist'; S.hist = id; S.del = null;
   draw();
+  window.scrollTo(0, 0);
 }
 
 async function confirmShip(clientId) {
@@ -594,6 +608,7 @@ function resumePark() {
   S.newRows = (p.newRows && p.newRows.length) ? p.newRows : [{ tag: '', weight: '' }];
   S.tagPick = TAG_START.slice();
   S.holdPick = true;
+  S.pinTop = true;
   S.skipCapture = true;
   draw();
 }
@@ -762,6 +777,7 @@ function startWeigh() {
   S.wq = '';
   S.tagPick = TAG_START.slice();
   S.holdPick = true;
+  S.pinTop = true;
   S.skipCapture = true;
   draw();
 }
