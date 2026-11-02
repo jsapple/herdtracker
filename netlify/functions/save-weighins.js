@@ -44,7 +44,7 @@ exports.handler = async (event) => {
 
     if (!animal) {
       const tag = parseTag(entry.tag);
-      if (!tag) return json(400, { error: 'Enter the tag as a number.' });
+      if (!tag) return json(400, { error: 'Set a tag.' });
       const matches = (animals || []).filter((a) => parseTag(a.tag) === tag);
       const active = matches.find((a) => a.status === 'active');
       const shipped = matches.filter((a) => a.status === 'shipped')

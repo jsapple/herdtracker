@@ -9,7 +9,8 @@ const S = {
   view: 'l', role: null, id: null, data: null, cur: null, fails: 0,
   mode: null, sel: [], rc: false, rm: false, ra: null, sh: false, busy: false,
   weighDate: null, draft: {}, newRows: [], hist: null,
-  q: '', wq: '', cut: null, del: null, skipCapture: false
+  q: '', wq: '', del: null, skipCapture: false,
+  tagPick: ['9', '6', '3', '6'], holdPick: false, wheelLock: false
 };
 
 let mt; const msg = (t) => { $('#msg').textContent = t; clearTimeout(mt); if (t) mt = setTimeout(() => msg(''), 7000); };
@@ -48,12 +49,66 @@ function ago(n) {
 const today = () => HerdStats.localToday();
 const st = (a) => HerdStats.animalStats(a, today());
 const grp = (list) => HerdStats.groupStats(list, today());
+const WHEEL = [''].concat('0123456789'.split(''), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''));
+const TAG_START = ['9', '6', '3', '6'];
 const tagNum = (raw) => {
-  const s = String(raw == null ? '' : raw).trim();
-  if (!/^\d+$/.test(s)) return null;
-  const n = s.replace(/^0+(?=\d)/, '');
-  return n && n.length <= 12 ? n : null;
+  const s = String(raw == null ? '' : raw).toUpperCase().replace(/[^0-9A-Z]/g, '');
+  if (!s || s.length > 12) return null;
+  return s;
 };
+function tagToWheels(tag) {
+  const chars = (tagNum(tag) || '').split('').slice(0, 4);
+  while (chars.length < 4) chars.push('');
+  return chars;
+}
+function readWheels(root) {
+  if (!root) return TAG_START.slice();
+  return [...root.querySelectorAll('.wheel')].map((col) => {
+    const i = Math.round(col.scrollTop / 56);
+    return WHEEL[Math.max(0, Math.min(WHEEL.length - 1, i))] || '';
+  });
+}
+function captureWheels() {
+  const live = document.getElementById('wheels');
+  if (live) S.tagPick = readWheels(live);
+}
+function wheelTag() {
+  return tagNum(readWheels(document.getElementById('wheels')).join(''));
+}
+function markWheel(col) {
+  const i = Math.max(0, Math.min(WHEEL.length - 1, Math.round(col.scrollTop / 56)));
+  [...col.children].forEach((el, n) => el.classList.toggle('on', n === i + 1));
+  if (S.wheelLock) return;
+  if (!S.tagPick || S.tagPick.length !== 4) S.tagPick = TAG_START.slice();
+  S.tagPick[Number(col.getAttribute('data-wheel'))] = WHEEL[i];
+}
+function mountWheels() {
+  const root = document.getElementById('wheels');
+  if (!root) return;
+  const apply = () => {
+    const chars = (S.tagPick || TAG_START).slice(0, 4);
+    while (chars.length < 4) chars.push('');
+    [...root.querySelectorAll('.wheel')].forEach((col, n) => {
+      let i = WHEEL.indexOf(chars[n] || '');
+      if (i < 0) i = 0;
+      col.scrollTop = i * 56;
+      markWheel(col);
+    });
+  };
+  S.wheelLock = true;
+  apply();
+  requestAnimationFrame(() => {
+    if (!document.getElementById('wheels')) { S.wheelLock = false; return; }
+    apply();
+    requestAnimationFrame(() => { S.wheelLock = false; });
+  });
+}
+function wheelBox() {
+  return `<div class="wheels" id="wheels">${[0, 1, 2, 3].map((n) => {
+    const cells = WHEEL.map((c) => `<div class="wcell">${c ? esc(c) : '·'}</div>`).join('');
+    return `<div class="wheel" data-wheel="${n}" aria-label="Tag character ${n + 1}" onscroll="markWheel(this)"><div class="wcell wpad"></div>${cells}<div class="wcell wpad"></div></div>`;
+  }).join('')}</div>`;
+}
 const tagSort = (a, b) => String(a.tag).localeCompare(String(b.tag), undefined, { numeric: true, sensitivity: 'base' });
 function gainSort(a, b) {
   const av = st(a).adg == null ? Infinity : st(a).adg;
@@ -105,25 +160,11 @@ function clientsSorted() {
 // ───────────────────────────── views ─────────────────────────────
 
 const loginV = () => `
-<div class="card c"><h2 class=signin>Sign in</h2>
+<div class="login-page"><div class="card c"><h2 class=signin>Sign in</h2>
 <p class=mu>Enter the code you were sent.</p>
-<input id=code maxlength=8 autocomplete=off autocapitalize=characters placeholder="CODE" onkeydown="if(event.key==='Enter')login()">
-<button class=bt onclick="login()">Continue</button></div>`;
-
-function deviceRows(list, scope, clientId) {
-  if (!list || !list.length) return '<p class=mu>No devices linked yet.</p>';
-  return list.map((d) => {
-    const mine = d.deviceId === dev;
-    const key = scope + ':' + (clientId || '') + ':' + d.deviceId;
-    const confirm = S.cut === key;
-    return `<div class=row><div>${mine && scope === 'producer' ? 'This device' : 'Other device'}<br><span class=mu>Linked ${fmtStamp(d.linkedAt)}</span></div><button type=button class="mini${confirm ? ' bad' : ''}" onclick="removeDevice('${scope}','${clientId || ''}','${d.deviceId}')">${confirm ? 'Confirm remove' : 'Remove'}</button></div>`;
-  }).join('');
-}
-function deviceCard(scope, list, clientId) {
-  const n = (list || []).length;
-  const title = scope === 'producer' ? `Your devices · ${n} of 4` : `Client devices · ${n} of 4`;
-  return `<details class="card devs"><summary>${title}</summary>${deviceRows(list, scope, clientId)}<p class=mu>Signing out leaves the device linked. Remove an old phone here.</p></details>`;
-}
+<input id=code maxlength=32 autocomplete=off autocapitalize=characters placeholder="CODE" onkeydown="if(event.key==='Enter')login()">
+<button class=bt onclick="login()">Continue</button></div>
+<button type="button" class="legal" onclick="openLegal()">Terms of use and privacy policy</button></div>`;
 
 function reviewV() {
   if (!S.data.review || !S.data.review.length) return '';
@@ -142,7 +183,6 @@ function prodV() {
 ${parkNote()}
 <div class=band><div><b>${clients.length}</b>clients</div><div><b>${head}</b>head</div></div>
 ${reviewV()}${list}
-${deviceCard('producer', S.data.devices || [], '')}
 <div class=card><div class=hd>Add a client</div><input id=nn placeholder="Client name" onkeydown="if(event.key==='Enter')addClient()"><button class=bt onclick="addClient()">Add client and make code</button></div>
 ${pageTools('producer')}`;
 }
@@ -218,7 +258,7 @@ ${typicalV(g)}
 <div class=card>
 ${actions}
 ${selecting ? '<p class=mu>Tap each animal that went on the truck.</p>' : ''}
-<input id=q inputmode=numeric placeholder="Find a tag" value="${attr(S.q)}" oninput="filterTags(this.value)" autocomplete=off aria-label="Find a tag">
+<input id=q inputmode=text autocapitalize=characters placeholder="Find a tag" value="${attr(S.q)}" oninput="filterTags(this.value)" autocomplete=off aria-label="Find a tag">
 <div id=herd>${animals.map((a) => animalV(a, g, selecting)).join('') || `<p class=mu>${p ? 'No active animals. Tap Weigh, then Add a new tag.' : 'No active animals.'}</p>`}</div>
 ${selecting ? `<div class=sb><button type=button class=sm onclick="S.mode=null;S.sel=[];draw()">Cancel</button><button type=button class=bt2 ${S.sel.length ? '' : 'disabled'} onclick="S.mode='conf';draw()">Ship ${S.sel.length}</button></div>` : ''}
 </div>
@@ -250,8 +290,8 @@ ${rows}
 <div class="sb sit"><button type=button class=bt2 id=savew onclick="saveWeigh('${clientId}')">Save weights</button></div>
 </div>
 <div class=card><div class=hd>Add a new tag</div>
-<input id=newtag inputmode=numeric enterkeyhint=done placeholder="input tag number" autocomplete=off aria-label="New tag" onkeydown="if(event.key==='Enter'){event.preventDefault();saveTag('${clientId}')}">
-<button type=button class=sm2 style="width:100%" onclick="saveTag('${clientId}')">Save tag</button>
+${wheelBox()}
+<button type=button class="sm2 tag-save" onclick="saveTag('${clientId}')">Save tag</button>
 </div>
 ${back}`;
 }
@@ -268,7 +308,7 @@ function histV(id) {
     const key = 'w:' + a.id + ':' + date;
     return `<div class=row data-prev="${date}" style="flex-wrap:wrap"><div class=pair style="flex:1"><input type=date class=hdte value="${date}" aria-label="Weigh date for ${attr(a.tag)}"><input class=hwt inputmode=numeric value="${weight}" aria-label="Pounds" style="flex:none;width:110px"></div><input class=hnote maxlength=200 placeholder="add field notes" aria-label="Note for this day" value="${attr(text)}"><button type=button class="mini bad hist-act" onclick="deleteWeigh('${a.id}','${date}')">${S.del === key ? 'Confirm remove' : 'Remove'}</button><button type=button class="mini hist-act" onclick="saveHistRow('${a.id}', this)">Save</button></div>`;
   }).join('') || '<p class=mu>No weights yet.</p>';
-  const edit = p ? `<div class=hd style="margin-top:16px">Change Tag</div><p class=mu>Type a new number if this tag was entered wrong. The weights stay on this animal.</p><div class=pair><input id=tagname inputmode=numeric value="${attr(a.tag)}" aria-label="Tag"><button type=button class=mini onclick="renameAnimal('${a.id}')">Save tag</button></div><div class=hd style="margin-top:16px">Add a weigh-in</div><p class=mu>Pick the date this weight was taken. Change it for an earlier weigh-in. A date after this animal shipped starts a new animal and leaves this record as history.</p><div class=pair><input type=date id=ad value="${today()}" aria-label="Date for the new weigh-in"><input id=aw inputmode=numeric placeholder="lb" aria-label="Pounds" style="flex:none;width:110px"></div><button type=button class=bt onclick="addHistWeigh('${a.id}')">Add weigh-in</button><button type=button class="mini bad" style="margin-top:16px" onclick="deleteAnimal('${a.id}')">${S.del === 'a:' + a.id ? 'Confirm remove animal' : 'Remove animal'}</button>` : '';
+  const edit = p ? `<div class=hd style="margin-top:16px">Change Tag</div><p class=mu>Set the wheels if this tag was entered wrong. The weights stay on this animal.</p>${wheelBox()}<button type=button class="sm2 tag-save" onclick="renameAnimal('${a.id}')">Save tag</button><div class=hd style="margin-top:16px">Add a weigh-in</div><p class=mu>Pick the date this weight was taken. Change it for an earlier weigh-in. A date after this animal shipped starts a new animal and leaves this record as history.</p><div class=pair><input type=date id=ad value="${today()}" aria-label="Date for the new weigh-in"><input id=aw inputmode=numeric placeholder="lb" aria-label="Pounds" style="flex:none;width:110px"></div><button type=button class=bt onclick="addHistWeigh('${a.id}')">Add weigh-in</button><button type=button class="mini bad" style="margin-top:16px" onclick="deleteAnimal('${a.id}')">${S.del === 'a:' + a.id ? 'Confirm remove animal' : 'Remove animal'}</button>` : '';
   return `${back}<h2>${esc(a.tag)}</h2><div class=card><div class=hd>Past Weights</div>${rows}${edit}</div>${back}`;
 }
 
@@ -287,7 +327,7 @@ function clientV(id) {
   const g = grp(activeOf(id));
   const crumb = p && !S.mode ? '<button type=button class=lk onclick="backToClients()">‹ All clients</button>' : '';
   const head = `<h2>${esc(c.name)}</h2>`;
-  const code = p && !S.mode ? `<p class=mu>Client code <b>${esc(c.code)}</b> · ${(c.devices || []).length} of 4 devices</p><div class=cb><button type=button onclick="shareCode('${esc(c.code)}')">Share code</button><button type=button class="${S.rc ? 'cf' : ''}" onclick="reissueCode('${id}')">${S.rc ? 'confirm reissue' : 'reissue code'}</button></div>${S.rc ? '<p class=mu>This signs the client phones out and makes a new code. The cattle stay.</p>' : ''}${deviceCard('client', c.devices || [], id)}` : '';
+  const code = p && !S.mode ? `<p class=mu>Client code <b>${esc(c.code)}</b></p><div class=cb><button type=button onclick="shareCode('${esc(c.code)}')">Share code</button><button type=button class="${S.rc ? 'cf' : ''}" onclick="reissueCode('${id}')">${S.rc ? 'confirm reissue' : 'reissue code'}</button></div>${S.rc ? '<p class=mu>This signs the client phones out and makes a new code. The cattle stay.</p>' : ''}` : '';
   const waiting = p && !S.mode && parkedFor(id) ? parkNote() : '';
   let body;
   if (S.mode === 'weigh' && p) body = weighV(id);
@@ -298,6 +338,8 @@ function clientV(id) {
 }
 
 function draw() {
+  if (!S.holdPick) captureWheels();
+  S.holdPick = false;
   if (S.mode === 'weigh' && !S.skipCapture) captureWeigh();
   S.skipCapture = false;
   if (S.view !== 'c') { S.mode = null; S.sel = []; S.ra = null; S.rm = false; S.rc = false; }
@@ -308,6 +350,7 @@ function draw() {
   const top = document.getElementById('top');
   if (top) top.hidden = S.view !== 'l';
   if (S.q && document.getElementById('q')) filterTags(S.q);
+  mountWheels();
   stayAwake(S.role === 'producer' && S.view !== 'l');
 }
 
@@ -322,25 +365,31 @@ function filterTags(v) {
 // ───────────────────────────── actions ─────────────────────────────
 
 async function login() {
-  if (S.fails >= 5) return msg('Too many tries. Wait and try again, or ask for a new code.');
+  if (S.fails >= 5) return msg('Too many tries. Wait and try again.');
   const code = $('#code').value.trim().toUpperCase();
-  if (!code) return msg('Code not found');
   if (code.length === 8) { stayAwake(true); return producerLogin(code); }
   if (code.length === 6) return clientLogin(code);
-  msg('Enter the 6-character client code or the 8-character producer code.');
+  S.fails++;
+  msg('Code not found');
+}
+function loginFail(d, status) {
+  if (!status) return msg('Could not reach the server. Check your connection.');
+  S.fails++;
+  if (d && d.error === 'This account is paused.') return msg(d.error);
+  msg('Code not found');
 }
 
 async function clientLogin(code) {
-  const { ok, d } = await api('client-login', { code, deviceId: dev });
-  if (!ok) { S.fails++; return msg(d.error || 'Sign-in failed.'); }
+  const { ok, d, status } = await api('client-login', { code, deviceId: dev });
+  if (!ok) return loginFail(d, status);
   ls('ht_role', 'client'); ls('ht_id', d.client.id);
   S.role = 'client'; S.id = d.client.id;
   await loadClient();
 }
 
 async function producerLogin(code) {
-  const { ok, d } = await api('producer-login', { code, deviceId: dev });
-  if (!ok) { releaseAwake(); S.fails++; return msg(d.error || 'Sign-in failed.'); }
+  const { ok, d, status } = await api('producer-login', { code, deviceId: dev });
+  if (!ok) { releaseAwake(); return loginFail(d, status); }
   ls('ht_role', 'producer'); ls('ht_id', d.producer.id);
   S.role = 'producer'; S.id = d.producer.id;
   await loadProducer();
@@ -372,10 +421,10 @@ async function loadProducer(opts) {
 
 function openClient(id) {
   leaveWeigh();
-  S.cur = id; S.view = 'c'; S.mode = null; S.sel = []; S.q = ''; S.wq = ''; S.rc = false; S.rm = false; S.ra = null; S.del = null; S.cut = null;
+  S.cur = id; S.view = 'c'; S.mode = null; S.sel = []; S.q = ''; S.wq = ''; S.rc = false; S.rm = false; S.ra = null; S.del = null;
   draw();
 }
-function backToClients() { leaveWeigh(); S.view = 'p'; S.mode = null; S.q = ''; S.wq = ''; S.cut = null; S.rc = false; S.rm = false; draw(); }
+function backToClients() { leaveWeigh(); S.view = 'p'; S.mode = null; S.q = ''; S.wq = ''; S.rc = false; S.rm = false; draw(); }
 function backToList() { leaveWeigh(); S.mode = null; S.sel = []; S.hist = null; S.del = null; S.skipCapture = true; draw(); }
 
 // Signing out does not free a device slot. The device id stays linked.
@@ -426,17 +475,6 @@ async function reissueCode(clientId) {
   msg('New code: ' + d.code + '. The old code no longer works.');
 }
 
-async function removeDevice(scope, clientId, removeId) {
-  const key = scope + ':' + (clientId || '') + ':' + removeId;
-  if (S.cut !== key) { S.cut = key; return draw(); }
-  S.cut = null;
-  const { ok, d } = await api('remove-device', { producerId: S.id, deviceId: dev, scope, clientId: clientId || null, removeId });
-  if (!ok) return msg(d.error || 'Could not remove the device.');
-  if (d.signedOut) { signOut(); return msg('This device is signed out.'); }
-  await loadProducer({ keep: true });
-  msg('Device removed. The sign-in code still works.');
-}
-
 function setTargetInput(animalId, v) {
   const n = parseInt(String(v).replace(/\D/g, ''), 10);
   if (!n) return;
@@ -462,7 +500,13 @@ function toggleSel(id) {
   draw();
 }
 function startShip() { S.mode = 'sel'; S.sel = []; S.q = ''; draw(); }
-function openHist(id) { S.mode = 'hist'; S.hist = id; S.del = null; draw(); }
+function openHist(id) {
+  const a = animalById(id);
+  S.tagPick = tagToWheels(a && a.tag);
+  S.holdPick = true;
+  S.mode = 'hist'; S.hist = id; S.del = null;
+  draw();
+}
 
 async function confirmShip(clientId) {
   const date = $('#sd').value;
@@ -548,6 +592,8 @@ function resumePark() {
   S.weighDate = p.date || today();
   S.draft = p.draft || {};
   S.newRows = (p.newRows && p.newRows.length) ? p.newRows : [{ tag: '', weight: '' }];
+  S.tagPick = TAG_START.slice();
+  S.holdPick = true;
   S.skipCapture = true;
   draw();
 }
@@ -563,9 +609,9 @@ function entriesFrom(draft, newRows, clientId) {
     const weight = String(row.weight || '').trim();
     if (!rawTag && !weight) continue;
     if (!weight) continue;
-    if (!rawTag) return { error: 'Enter a tag number for that weight.' };
+    if (!rawTag) return { error: 'Set a tag for that weight.' };
     const tag = tagNum(rawTag);
-    if (!tag) return { error: 'Enter the tag as a number.' };
+    if (!tag) return { error: 'Set a tag.' };
     if (seenNew[tag]) return { error: 'Tag ' + tag + ' is entered more than once.' };
     seenNew[tag] = true;
     const active = activeOf(clientId).find((a) => tagNum(a.tag) === tag);
@@ -714,6 +760,8 @@ function startWeigh() {
     S.newRows = [{ tag: '', weight: '' }];
   }
   S.wq = '';
+  S.tagPick = TAG_START.slice();
+  S.holdPick = true;
   S.skipCapture = true;
   draw();
 }
@@ -728,9 +776,8 @@ function setWeighDate(v) {
 }
 async function saveTag(clientId) {
   if (S.busy) return;
-  const raw = (document.getElementById('newtag').value || '').trim();
-  const tag = tagNum(raw);
-  if (!tag) return msg('Enter the tag as a number.');
+  const tag = wheelTag();
+  if (!tag) return msg('Set a tag.');
   const active = activeOf(clientId).find((a) => tagNum(a.tag) === tag);
   if (active) return msg('Tag ' + tag + ' is already active on this client. Enter the weight next to it in the list.');
   S.busy = true;
@@ -743,12 +790,14 @@ async function saveTag(clientId) {
       p.tags = p.tags || [];
       if (p.tags.indexOf(tag) === -1) p.tags.push(tag);
       writePark(p);
-      document.getElementById('newtag').value = '';
+      S.tagPick = TAG_START.slice();
+      mountWheels();
       return msg('Saved on this phone, waiting for signal.');
     }
     return msg((d && d.error) || 'Could not save the tag.');
   }
-  document.getElementById('newtag').value = '';
+  S.tagPick = TAG_START.slice();
+  S.holdPick = true;
   S.skipCapture = true;
   await loadProducer({ keep: true });
   msg('Tag ' + tag + ' added. Enter its weight in the list.');
@@ -770,7 +819,7 @@ async function saveWeigh(clientId) {
     const weight = String(row.weight || '').trim();
     if (!rawTag || !weight) continue;
     const tag = tagNum(rawTag);
-    if (!tag) return msg('Enter the tag as a number.');
+    if (!tag) return msg('Set a tag.');
     if (seenNew[tag]) return msg('Tag ' + tag + ' is entered more than once.');
     seenNew[tag] = true;
     const active = activeOf(clientId).find((a) => tagNum(a.tag) === tag);
@@ -831,10 +880,12 @@ async function deleteAnimal(id) {
   msg('Animal removed.');
 }
 async function renameAnimal(id) {
-  const tag = document.getElementById('tagname').value.trim();
-  if (!tag) return msg('Enter a tag number.');
+  const tag = wheelTag();
+  if (!tag) return msg('Set a tag.');
   const { ok, d } = await api('animal-edit', { producerId: S.id, deviceId: dev, animalId: id, action: 'rename', tag });
   if (!ok) return msg(d.error || 'Could not rename the tag.');
+  S.tagPick = tagToWheels(d.tag || tag);
+  S.holdPick = true;
   S.mode = 'hist'; S.hist = id; S.skipCapture = true;
   await loadProducer({ keep: true });
   msg('Tag saved.');
@@ -844,6 +895,32 @@ function pageTools(kind, clientId) {
   const dl = clientId ? `downloadClient('${clientId}')` : 'downloadAll()';
   const pr = clientId ? `printClient('${clientId}')` : 'printAll()';
   return `<div class=tools><button type=button onclick="openHow('${kind}')">user guide</button><button type=button onclick="${pr}">Print</button><button type=button onclick="${dl}">Download</button></div>`;
+}
+function openLegal() {
+  const box = document.getElementById('how');
+  if (!box) return;
+  const sections = [
+    ['Terms of use', [
+      'Herd Tracker keeps a record of the tags, weights, notes, and shipments a producer chooses to share with a client.',
+      'Gain figures, target dates, and the words On Target are calculations from the numbers entered in the app. They are not a promise of gain, health, a sale price, or a day the cattle will ship.',
+      'You are responsible for the tags, weights, and notes you enter, and for checking them before you rely on them or pass them on. The app does not inspect the scale or the cattle.',
+      'A code opens the records tied to that code. Anyone who has the code can see those records. The producer chooses who receives a client code and is responsible for that choice.',
+      'The app is provided as it is. It may be unavailable. A weight typed on a phone is not part of the record until it has been saved and the phone has reached the service.',
+      'To the fullest extent the law allows, the operator of Herd Tracker is not liable for a wrong weight, a missed date, lost animals, lost gain, or lost profits from use of the app. If a liability is found anyway, it is limited to the amount paid for the app in the twelve months before the claim.',
+      'The operator may pause or close an account. Closing a producer account can delete that producer’s clients, cattle, and weights. Removing a client deletes that client’s cattle and weights.',
+      'These terms are dated November 1, 2026. If they change, the new terms apply when you keep using the app.'
+    ]],
+    ['Privacy policy', [
+      'The app stores a producer’s name and email, sign-in codes, client names, animal tags, weights, dates, targets, ship dates, ship weights, field notes, a random id for each phone, and the last day that phone opened the app.',
+      'That information is used to run the app. It is not sold. It is not used for advertising.',
+      'A producer can see the clients and cattle on that account. A client can see the cattle shared with that client. Netlify hosts the app and Supabase stores the database, only so the app can run.',
+      'The phone keeps its random id in local storage so the same phone can open the app again. Signing out does not delete the herd.',
+      'Deleting a client or a producer account deletes the records that belong to it.'
+    ]]
+  ];
+  box.hidden = false;
+  box.innerHTML = `<div class=card><div class=hd>Terms of use and privacy policy</div>${sections.map(([title, paras]) => `<h2>${esc(title)}</h2>${paras.map((p) => '<p>' + esc(p) + '</p>').join('')}`).join('')}<button type=button class=bt onclick="closeHow()">Close</button></div>`;
+  box.scrollTop = 0;
 }
 function openHow(kind) {
   const box = document.getElementById('how');
@@ -855,13 +932,13 @@ function openHow(kind) {
     'Remove client is at the bottom of that page. Tap it, then tap again to confirm. That deletes the client, their cattle, and every weight. It cannot be undone.',
     'Reissue code makes a new 6-character code and signs the client phones out. The cattle stay.',
     'Tap Weigh. The date is today on this phone. Change it when you are entering an older weigh-in. Use whole pounds. Decimals are not accepted.',
-    'Tags already in the herd are listed as numbers only. Type the pounds next to the tag. Next on the keyboard moves to the next empty animal.',
-    'A brand-new tag goes under Add a new tag. Save the number only. Then enter its weight next to that tag in the list.',
+    'Tags already in the herd are listed. Type the pounds next to the tag. Next on the keyboard moves to the next empty animal.',
+    'A brand-new tag goes under Add a new tag. Set the wheels, then Save tag. Then enter its weight next to that tag in the list.',
     'The target number under each animal is shared with the client. Either of you can change it. The other phone shows the new number the next time the app is opened. Beside that number the card says On Target, the estimated date, or why a date is not ready. It also says when an animal is gaining slower than this group.',
     'If the signal drops, weights and new tags stay on this phone and send when you have service again.',
     'Ship from the list when cattle leave. Reactivate only if that ship was marked by mistake.',
     'A shipped tag can be used again. That starts a new animal. The old weights stay on the shipped record.',
-    'Open Past Weights on a tag to correct that day or add a short note. Save on that row stores the date, the pounds, and the note.',
+    'Open Past Weights on a tag to correct that day or add a short note. The wheels under Change Tag fix a tag that was entered wrong. Save on a row stores the date, the pounds, and the note.',
     'Download or Print at the bottom of the page. The file and the paper copy are the record for you or the client. A note shows in Field Notes.'
   ] : [
     'Sign in once with the 6-character code from your producer. It stays signed in on this phone.',
@@ -1009,9 +1086,9 @@ if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
     S.weighDate = today(); S.draft = {}; S.newRows = [{ tag: '', weight: '' }]; S.q = '';
     S.data = {
       producer: { name: 'Miller Feedyard' },
-      devices: [{ deviceId: dev, linkedAt: '2026-10-01T18:00:00Z' }, { deviceId: 'other-device', linkedAt: '2026-09-02T18:00:00Z' }],
+      devices: [{ deviceId: dev, linkedAt: '2026-10-01T18:00:00Z', lastSeenAt: '2026-10-29T18:00:00Z' }, { deviceId: 'other-device', linkedAt: '2026-09-02T18:00:00Z', lastSeenAt: '2026-09-02T18:00:00Z' }],
       review: [],
-      clients: [{ id: 'c1', name: 'Hartley Ranch', code: 'ABC123', devicesLinked: 1, devices: [{ deviceId: 'client-phone', linkedAt: '2026-08-15T18:00:00Z' }] }],
+      clients: [{ id: 'c1', name: 'Hartley Ranch', code: 'ABC123', devicesLinked: 1, devices: [{ deviceId: 'client-phone', linkedAt: '2026-08-15T18:00:00Z', lastSeenAt: '2026-08-15T18:00:00Z' }] }],
       animals: [
         { id: 'a1', clientId: 'c1', tag: '12', targetLb: 1500, status: 'active', weighins: [['2026-09-01', 1100, ''], ['2026-10-01', 1250, 'muddy lot']] },
         { id: 'a2', clientId: 'c1', tag: '4', targetLb: 1500, status: 'active', weighins: [] },

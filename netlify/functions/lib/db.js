@@ -47,6 +47,10 @@ async function verifyProducer(producerId, deviceId) {
     .eq('producer_id', producerId)
     .eq('device_id', deviceId)
     .maybeSingle();
+  if (data) {
+    await db.from('producer_devices').update({ last_seen_at: new Date().toISOString() })
+      .eq('producer_id', producerId).eq('device_id', deviceId);
+  }
   return !!data;
 }
 
@@ -60,6 +64,10 @@ async function verifyClient(clientId, deviceId) {
     .eq('client_id', clientId)
     .eq('device_id', deviceId)
     .maybeSingle();
+  if (data) {
+    await db.from('client_devices').update({ last_seen_at: new Date().toISOString() })
+      .eq('client_id', clientId).eq('device_id', deviceId);
+  }
   return !!data;
 }
 module.exports.verifyClient = verifyClient;
@@ -97,15 +105,46 @@ function parseWeight(v) {
   return n;
 }
 
-// Tag numbers are digits. "012" and "12" are the same tag. Letters are refused.
+// A tag is letters and digits, up to 12. A leading zero stays. A blank wheel is the empty slot, so "012" and "12" are different tags.
 function parseTag(raw) {
-  const s = String(raw == null ? '' : raw).trim();
-  if (!/^\d+$/.test(s)) return null;
-  const n = s.replace(/^0+(?=\d)/, '');
-  if (!n || n.length > 12) return null;
-  return n;
+  const s = String(raw == null ? '' : raw).toUpperCase().replace(/[^0-9A-Z]/g, '');
+  if (!s || s.length > 12) return null;
+  return s;
 }
 
 module.exports.parseIsoDate = parseIsoDate;
 module.exports.parseWeight = parseWeight;
 module.exports.parseTag = parseTag;
+
+// Five phones per code. A new phone takes the seat of the one that has gone
+// the longest without opening the app.
+const DEVICE_CAP = 5;
+
+function seenAt(row) {
+  return row.last_seen_at || row.linked_at || '';
+}
+
+async function claimDevice(table, ownerColumn, ownerId, deviceId) {
+  const { data, error } = await db.from(table)
+    .select('device_id, linked_at, last_seen_at')
+    .eq(ownerColumn, ownerId);
+  if (error) return { ok: false, error: 'Could not check the phones on this code.' };
+  let list = data || [];
+  if (list.some((d) => d.device_id === deviceId)) {
+    await db.from(table).update({ last_seen_at: new Date().toISOString() })
+      .eq(ownerColumn, ownerId).eq('device_id', deviceId);
+    return { ok: true };
+  }
+  while (list.length >= DEVICE_CAP) {
+    list.sort((a, b) => String(seenAt(a)).localeCompare(String(seenAt(b))));
+    const oldest = list[0];
+    const { error: dropErr } = await db.from(table).delete()
+      .eq(ownerColumn, ownerId).eq('device_id', oldest.device_id);
+    if (dropErr) return { ok: false, error: 'Could not free a seat for this phone.' };
+    list = list.filter((d) => d.device_id !== oldest.device_id);
+  }
+  const { error: insErr } = await db.from(table).insert({ [ownerColumn]: ownerId, device_id: deviceId });
+  if (insErr) return { ok: false, error: 'Could not link this phone.' };
+  return { ok: true };
+}
+module.exports.claimDevice = claimDevice;

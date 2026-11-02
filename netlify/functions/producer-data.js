@@ -11,10 +11,10 @@ exports.handler = async (event) => {
   const { data: producer } = await db.from('producers').select('id, name, status').eq('id', producerId).single();
 
   const { data: clients } = await db
-    .from('clients').select('id, name, code, client_devices(device_id, linked_at)').eq('producer_id', producerId);
+    .from('clients').select('id, name, code, client_devices(device_id, linked_at, last_seen_at)').eq('producer_id', producerId);
 
   const { data: devices } = await db
-    .from('producer_devices').select('device_id, linked_at').eq('producer_id', producerId).order('linked_at');
+    .from('producer_devices').select('device_id, linked_at, last_seen_at').eq('producer_id', producerId).order('linked_at');
 
   const { data: animals } = await db
     .from('animals')
@@ -33,10 +33,10 @@ exports.handler = async (event) => {
   const shapedClients = (clients || []).map((c) => ({
     id: c.id, name: c.name, code: c.code,
     devicesLinked: (c.client_devices || []).length,
-    devices: (c.client_devices || []).map((d) => ({ deviceId: d.device_id, linkedAt: d.linked_at }))
+    devices: (c.client_devices || []).map((d) => ({ deviceId: d.device_id, linkedAt: d.linked_at, lastSeenAt: d.last_seen_at || d.linked_at }))
   }));
 
-  const shapedDevices = (devices || []).map((d) => ({ deviceId: d.device_id, linkedAt: d.linked_at }));
+  const shapedDevices = (devices || []).map((d) => ({ deviceId: d.device_id, linkedAt: d.linked_at, lastSeenAt: d.last_seen_at || d.linked_at }));
 
   return json(200, { producer, clients: shapedClients, animals: shapedAnimals, review: review || [], devices: shapedDevices });
 };

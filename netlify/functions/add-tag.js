@@ -8,7 +8,7 @@ exports.handler = async (event) => {
   if (!(await verifyProducer(producerId, deviceId))) return json(403, { error: 'Not signed in' });
   if (!(await clientBelongsToProducer(clientId, producerId))) return json(404, { error: 'Client not found' });
   const tag = parseTag(raw);
-  if (!tag) return json(400, { error: 'Enter the tag as a number.' });
+  if (!tag) return json(400, { error: 'Set a tag.' });
 
   const { data: animals, error: loadErr } = await db
     .from('animals')

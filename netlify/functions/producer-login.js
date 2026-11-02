@@ -1,6 +1,6 @@
 // POST { code, deviceId }  ->  { producer: {id, name} }
-// Same four-device model as clients, but an 8-char code.
-const { db, json } = require('./lib/db');
+// Up to 5 phones. A new phone takes the seat of the one opened least recently.
+const { db, json, claimDevice } = require('./lib/db');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
@@ -16,18 +16,8 @@ exports.handler = async (event) => {
   if (!producer) return json(404, { error: 'Code not found' });
   if (producer.status !== 'active') return json(403, { error: 'This account is paused.' });
 
-  const { data: devices } = await db
-    .from('producer_devices')
-    .select('device_id')
-    .eq('producer_id', producer.id);
-
-  const already = devices.some((d) => d.device_id === deviceId);
-  if (!already) {
-    if (devices.length >= 4) {
-      return json(403, { error: 'This code is already linked to four devices. Contact us for a new code.' });
-    }
-    await db.from('producer_devices').insert({ producer_id: producer.id, device_id: deviceId });
-  }
+  const claimed = await claimDevice('producer_devices', 'producer_id', producer.id, deviceId);
+  if (!claimed.ok) return json(403, { error: claimed.error });
 
   return json(200, { producer: { id: producer.id, name: producer.name, status: producer.status } });
 };

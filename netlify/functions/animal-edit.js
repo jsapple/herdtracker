@@ -20,7 +20,7 @@ exports.handler = async (event) => {
 
   if (action === 'rename') {
     const tag = parseTag(body.tag);
-    if (!tag) return json(400, { error: 'Enter the tag as a number.' });
+    if (!tag) return json(400, { error: 'Set a tag.' });
     const { data: others } = await db.from('animals').select('id, tag, status')
       .eq('client_id', animal.client_id).eq('status', 'active').neq('id', animal.id);
     const clash = animal.status === 'active' && (others || []).find((a) => parseTag(a.tag) === tag);

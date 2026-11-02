@@ -18,9 +18,12 @@ create table producer_devices (
   producer_id uuid not null references producers(id) on delete cascade,
   device_id   text not null,                 -- random id generated on the phone, stored locally
   linked_at   timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(), -- last day this phone opened the app
   primary key (producer_id, device_id)
 );
--- App code enforces "max 2 devices per producer" before inserting here.
+-- App code allows 5 phones. A new phone takes the seat of the one opened least recently.
+-- Existing database: do not re-run this file. Run only:
+-- alter table producer_devices add column if not exists last_seen_at timestamptz not null default now();
 
 -- ───────────────────────────── clients ─────────────────────────────
 create table clients (
@@ -37,16 +40,19 @@ create table client_devices (
   client_id   uuid not null references clients(id) on delete cascade,
   device_id   text not null,
   linked_at   timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
   primary key (client_id, device_id)
 );
--- App code enforces "max 2 devices per client" before inserting here.
+-- Same 5-phone rule as producer phones.
+-- Existing database: do not re-run this file. Run only:
+-- alter table client_devices add column if not exists last_seen_at timestamptz not null default now();
 
 -- ───────────────────────────── animals ─────────────────────────────
 create table animals (
   id          uuid primary key default gen_random_uuid(),
   producer_id uuid not null references producers(id) on delete cascade,
   client_id   uuid not null references clients(id) on delete cascade,
-  tag         text not null,                 -- one active animal per number on this client
+  tag         text not null,                 -- one active animal per tag on this client. Letters and digits. A leading zero stays.
   target_lb   int  not null default 1500 check (target_lb between 600 and 2500),
   status      text not null default 'active' check (status in ('active','shipped')),
   ship_date   date,

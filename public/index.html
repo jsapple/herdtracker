@@ -16,6 +16,8 @@ header[hidden]{display:none}
 main{max-width:520px;margin:0 auto;padding:16px 16px 100px}
 h2{margin:0 0 12px;font-size:26px}.c{text-align:center}
 .signin{margin:4px 0 18px;font-size:34px;font-weight:500;letter-spacing:-.03em;line-height:1.1}
+.login-page{min-height:calc(100dvh - 120px);display:flex;flex-direction:column}
+.legal{margin-top:auto;width:100%;background:none;border:0;color:var(--mu);font:inherit;font-size:15px;font-weight:700;min-height:48px;text-align:center;cursor:pointer}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:18px 16px;margin-bottom:16px}
 .mu{color:var(--mu);font-size:16px;margin:8px 0}
 #msg{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);max-width:488px;margin:0 auto;background:var(--ac);color:#000;padding:16px;border-radius:14px;font-weight:700;z-index:9}#msg:empty{display:none}
@@ -54,18 +56,17 @@ input[type=file]{padding:10px}input::file-selector-button{font:inherit;padding:1
 .act{display:flex;gap:12px;margin:0 0 12px}.act button{flex:1;min-height:52px;padding:0 12px;font:inherit;font-size:18px;font-weight:800;border:0;border-radius:12px}
 .act .weigh{background:var(--ok);color:#000}.act .ship{background:var(--wa);color:#000}
 .sm2{min-height:44px;padding:0 16px;font:inherit;font-size:16px;font-weight:700;border-radius:12px;border:2px solid var(--ac);background:none;color:var(--ac)}
+.tag-save{display:block;width:100%;box-sizing:border-box;margin:48px 0 20px}
 .bt2{flex:1;min-height:44px;padding:0 12px;font:inherit;font-size:17px;font-weight:800;border:0;border-radius:12px;background:var(--ac);color:#000}.bt2:disabled{opacity:.35}
 .sb{position:sticky;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);display:flex;align-items:stretch;gap:10px;margin-top:12px;padding:0;background:#000;border:0;border-radius:12px;overflow:hidden;z-index:4}
 .sb.sit{position:static;margin-top:8px;padding:0;background:none;border:0}
 #wd,#wq,#sd{display:block;width:100%;box-sizing:border-box;height:56px;min-height:56px;max-height:56px;padding:0 14px;margin:8px 0;font-size:18px;line-height:56px}
-#q,#newtag{text-align:center}
-#q::placeholder,#newtag::placeholder{text-align:center;color:var(--mu);opacity:1}
+#q{text-align:center}
+#q::placeholder{text-align:center;color:var(--mu);opacity:1}
 #wd,#sd{-webkit-appearance:none;appearance:none}
 #wd::-webkit-date-and-time-value,#sd::-webkit-date-and-time-value{text-align:left;margin:0;min-height:56px;height:56px;line-height:56px}
 #wd::-webkit-datetime-edit,#wd::-webkit-datetime-edit-fields-wrapper,#sd::-webkit-datetime-edit,#sd::-webkit-datetime-edit-fields-wrapper{padding:0;margin:0;height:56px;line-height:56px}
 summary{font-weight:800;min-height:48px;display:flex;align-items:center;cursor:pointer}
-.devs{padding:12px 16px}
-.devs summary{min-height:36px;font-size:17px}
 .gh{display:flex;flex-direction:column;gap:2px;padding:16px 0 4px;border-top:1px solid var(--bd)}.gh span{color:var(--mu);font-size:15px}
 .cb .cf2{background:var(--ac);border-color:var(--ac);color:#000}
 .fin{font-size:32px;font-weight:800;line-height:1.1;color:var(--ac)}.fin.ok{color:var(--ok)}
@@ -87,6 +88,12 @@ summary{font-weight:800;min-height:48px;display:flex;align-items:center;cursor:p
 .rm.on{background:var(--rd);color:#000}
 .wrow{align-items:center}
 .wtag{font-size:32px;font-weight:800;line-height:1;letter-spacing:.02em}
+.wheels{position:relative;display:flex;gap:6px;height:168px;margin:8px 0 4px}
+.wheels::before{content:"";position:absolute;left:0;right:0;top:56px;height:56px;border-top:2px solid var(--ac);border-bottom:2px solid var(--ac);pointer-events:none;z-index:1}
+.wheel{flex:1;height:168px;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.wheel::-webkit-scrollbar{display:none}
+.wcell{height:56px;scroll-snap-align:center;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:500;color:var(--mu);opacity:.4;user-select:none}
+.wcell.on{font-size:34px;font-weight:800;color:var(--tx);opacity:1}
 .wrow input{width:128px;flex:none;margin:0;min-height:72px;padding:8px;text-align:center;font-size:32px;font-weight:800}
 .newtag{margin:8px 0}.newtag input{flex:1;width:auto;min-height:72px;padding:8px;text-align:center;font-size:32px;font-weight:800}
 .wrow input::placeholder,.newtag input::placeholder{color:var(--mu);opacity:1}
